@@ -18,56 +18,56 @@ const ROLES_COLLECTION = "userRoles";
 const LOGS_COLLECTION = "audit_logs";
 
 // Initial data to seed Firestore if collection is empty
-export const initialData = [
-  { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '16/03/2026', endDate: '18/03/2026', state: 'En curso', progress: 0, comment: '' },
-  { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '19/03/2026', endDate: '24/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '25/03/2026', endDate: '26/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '27/03/2026', endDate: '27/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '30/03/2026', endDate: '01/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '02/04/2026', endDate: '07/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '08/04/2026', endDate: '09/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '10/04/2026', endDate: '10/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '13/04/2026', endDate: '15/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '16/04/2026', endDate: '21/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '22/04/2026', endDate: '23/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '24/04/2026', endDate: '24/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '23/03/2026', endDate: '25/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '26/03/2026', endDate: '31/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '01/04/2026', endDate: '02/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '03/04/2026', endDate: '03/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '06/04/2026', endDate: '08/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '09/04/2026', endDate: '14/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '15/04/2026', endDate: '16/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '17/04/2026', endDate: '17/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '20/04/2026', endDate: '22/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '23/04/2026', endDate: '28/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '29/04/2026', endDate: '30/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-  { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '01/05/2026', endDate: '01/05/2026', state: 'No iniciado', progress: 0, comment: '' }
-];
+// export const initialData = [
+//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '16/03/2026', endDate: '18/03/2026', state: 'En curso', progress: 0, comment: '' },
+//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '19/03/2026', endDate: '24/03/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '25/03/2026', endDate: '26/03/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '27/03/2026', endDate: '27/03/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '30/03/2026', endDate: '01/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '02/04/2026', endDate: '07/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '08/04/2026', endDate: '09/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '10/04/2026', endDate: '10/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '13/04/2026', endDate: '15/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '16/04/2026', endDate: '21/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '22/04/2026', endDate: '23/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '24/04/2026', endDate: '24/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '23/03/2026', endDate: '25/03/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '26/03/2026', endDate: '31/03/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '01/04/2026', endDate: '02/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '03/04/2026', endDate: '03/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '06/04/2026', endDate: '08/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '09/04/2026', endDate: '14/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '15/04/2026', endDate: '16/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '17/04/2026', endDate: '17/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '20/04/2026', endDate: '22/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '23/04/2026', endDate: '28/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '29/04/2026', endDate: '30/04/2026', state: 'No iniciado', progress: 0, comment: '' },
+//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '01/05/2026', endDate: '01/05/2026', state: 'No iniciado', progress: 0, comment: '' }
+// ];
 
-/**
- * Seeds Firestore with the initial data if the collection is empty.
- */
-export async function seedInitialDataIfEmpty(db) {
-  const colRef = collection(db, COLLECTION);
-  const snapshot = await getDocs(colRef);
+// /**
+//  * Seeds Firestore with the initial data if the collection is empty.
+//  */
+// export async function seedInitialDataIfEmpty(db) {
+//   const colRef = collection(db, COLLECTION);
+//   const snapshot = await getDocs(colRef);
 
-  if (!snapshot.empty) return; // Already seeded
+//   if (!snapshot.empty) return; // Already seeded
 
-  const promises = initialData.map(item => {
-    const projectId = item.project.toLowerCase().replace(/[^a-z0-9]/gi, '-');
-    const id = `${item.project}-${item.phase}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    return setDoc(doc(db, COLLECTION, id), { ...item, id, projectId });
-  });
+//   const promises = initialData.map(item => {
+//     const projectId = item.project.toLowerCase().replace(/[^a-z0-9]/gi, '-');
+//     const id = `${item.project}-${item.phase}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+//     return setDoc(doc(db, COLLECTION, id), { ...item, id, projectId });
+//   });
 
-  await Promise.all(promises);
-  
-  // Seed initial client
-  const clientRef = doc(db, CLIENTS_COLLECTION, "mutual");
-  await setDoc(clientRef, { name: "Mutual", id: "mutual", createdAt: Date.now() });
-  
-  console.log("Firestore seeded with initial data and Mutual client.");
-}
+//   await Promise.all(promises);
+
+//   // Seed initial client
+//   const clientRef = doc(db, CLIENTS_COLLECTION, "mutual");
+//   await setDoc(clientRef, { name: "Mutual", id: "mutual", createdAt: Date.now() });
+
+//   console.log("Firestore seeded with initial data and Mutual client.");
+// }
 
 /**
  * Subscribes to real-time Firestore updates.
@@ -123,9 +123,9 @@ export async function updatePhase(db, phaseId, updates) {
 export async function createNewProject(db, projectName, clientName = 'General', phases = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega']) {
   const timestamp = Date.now();
   const selectedPhases = (phases && phases.length > 0) ? phases : ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega'];
-  
+
   const projectId = `proj-${timestamp}`;
-  
+
   const promises = selectedPhases.map(phaseName => {
     // Unique ID for each phase using timestamp to avoid collisions
     const id = `${projectName}-${phaseName}-${timestamp}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
@@ -209,10 +209,10 @@ export async function archiveProject(db, projectId, user) {
 
   if (phasesToUpdate.length > 0) {
     const projData = phasesToUpdate[0].data();
-    await createAuditLog(db, user, 'ARCHIVE', { 
-      id: projectId, 
-      name: projData.project, 
-      client: projData.client 
+    await createAuditLog(db, user, 'ARCHIVE', {
+      id: projectId,
+      name: projData.project,
+      client: projData.client
     });
   }
 
@@ -234,10 +234,10 @@ export async function restoreProject(db, projectId, user) {
 
   if (phasesToUpdate.length > 0) {
     const projData = phasesToUpdate[0].data();
-    await createAuditLog(db, user, 'RESTORE', { 
-      id: projectId, 
-      name: projData.project, 
-      client: projData.client 
+    await createAuditLog(db, user, 'RESTORE', {
+      id: projectId,
+      name: projData.project,
+      client: projData.client
     });
   }
 
@@ -254,7 +254,7 @@ export async function deleteProjectPermanently(db, projectId, user) {
   // Try to query by projectId first
   const q = query(colRef, where("projectId", "==", projectId));
   let snapshot = await getDocs(q);
-  
+
   if (snapshot.empty) {
     // Fallback for legacy projects where the name was used as ID
     const qLegacy = query(colRef, where("project", "==", projectId));
@@ -267,10 +267,10 @@ export async function deleteProjectPermanently(db, projectId, user) {
   }
 
   const projData = snapshot.docs[0].data();
-  await createAuditLog(db, user, 'DELETE_PERMANENT', { 
-    id: projectId, 
-    name: projData.project, 
-    client: projData.client 
+  await createAuditLog(db, user, 'DELETE_PERMANENT', {
+    id: projectId,
+    name: projData.project,
+    client: projData.client
   });
 
   console.log(`data.js: Borrando ${snapshot.size} documentos...`);
@@ -288,7 +288,7 @@ export function aggregateProjectData(phases) {
   phases.forEach(item => {
     // Robust grouping using projectId if available, fallback to normalized project name
     const groupingKey = item.projectId || (item.project || '').replace(/\s+/g, ' ').trim();
-    
+
     if (!projects[groupingKey]) {
       projects[groupingKey] = {
         id: groupingKey,
