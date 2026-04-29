@@ -8,7 +8,6 @@
   <title>Nexus | Project Tracking</title>
   <!-- Flatpickr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/material_blue.css">
 </head>
 
 <body>
@@ -36,8 +35,12 @@
           </svg>
           Iniciar sesión
         </button>
-        <!-- Auth: shown when logged in -->
         <div id="userInfo" style="display:none; align-items:center; gap:0.5rem;">
+          <button id="showLogsBtn" 
+            style="display:none; font-size:0.75rem; padding:0.3rem 0.7rem; color:var(--text-muted); border-color:var(--card-border); margin-right: 0.5rem; gap: 0.4rem; align-items: center;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            Logs
+          </button>
           <div
             style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;"
             id="userAvatar">?</div>
@@ -165,6 +168,38 @@
         </button>
       </div>
     </main>
+
+    <!-- Logs View Section -->
+    <main id="logsSection" style="display: none; flex-direction: column; gap: 2rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+           <button onclick="window.showMainView()" class="glass-card" style="padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+           </button>
+           <h2 style="font-size: 1.75rem; font-weight: 700; margin: 0;">Historial de Auditoría</h2>
+        </div>
+        <button onclick="window.showMainView()" class="primary">Volver al Dashboard</button>
+      </div>
+
+      <section class="glass-card animate-fade-in" style="padding: 0; overflow: hidden;">
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--card-border);">
+                <th style="padding: 1rem; text-align: left; color: var(--text-muted);">Fecha y Hora</th>
+                <th style="padding: 1rem; text-align: left; color: var(--text-muted);">Usuario</th>
+                <th style="padding: 1rem; text-align: left; color: var(--text-muted);">Acción</th>
+                <th style="padding: 1rem; text-align: left; color: var(--text-muted);">Proyecto</th>
+                <th style="padding: 1rem; text-align: left; color: var(--text-muted);">Cliente</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <!-- Logs injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
 
   <!-- Edit Project Modal -->
@@ -187,18 +222,36 @@
             </select>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-              <label class="form-label">Fecha Inicio</label>
-              <input type="date" id="editStartDate" class="form-input" />
+          <div class="form-group">
+            <label class="form-label" style="display:flex; align-items:center; gap:0.5rem;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="color:var(--accent-primary);"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Rango de Fechas
+            </label>
+            <div style="position:relative;">
+              <input type="text" id="editDateRange" class="form-input"
+                placeholder="Selecciona inicio → fin en el calendario"
+                readonly
+                style="cursor:pointer; padding-right: 2.5rem;"/>
+              <span style="position:absolute; right:0.75rem; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </span>
             </div>
-            <div class="form-group">
-              <label class="form-label">Fecha Término</label>
-              <input type="date" id="editEndDate" class="form-input" />
+            <div style="display:flex; gap:1.5rem; margin-top:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                <span style="width:8px;height:8px;border-radius:50%;background:#6366f1;display:inline-block;"></span>
+                Inicio: <span id="displayStartDate" style="color:var(--text-color); font-weight:600;">—</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                <span style="width:8px;height:8px;border-radius:50%;background:#14b8a6;display:inline-block;"></span>
+                Fin: <span id="displayEndDate" style="color:var(--text-color); font-weight:600;">—</span>
+              </div>
             </div>
           </div>
+          <!-- Hidden inputs for form compatibility -->
+          <input type="hidden" id="editStartDate" />
+          <input type="hidden" id="editEndDate" />
           <p id="dateError"
-            style="display:none; color: #f87171; font-size: 0.8rem; margin-top: -0.75rem; margin-bottom: 0.5rem;">
+            style="display:none; color: #f87171; font-size: 0.8rem; margin-top: -0.25rem; margin-bottom: 0.5rem;">
             ⚠️ La fecha de inicio no puede ser mayor a la fecha de término.
           </p>
           <p id="deliveryError"

@@ -387,10 +387,7 @@ button.primary:hover {
   animation: fadeIn 0.4s ease forwards;
 }
 
-.delete-btn {
-  background: rgba(239, 68, 68, 0.4);
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  color: white;
+.delete-btn, .archive-btn {
   width: auto;
   height: 28px;
   padding: 0 0.75rem;
@@ -406,11 +403,31 @@ button.primary:hover {
   transition: all 0.2s;
 }
 
+.delete-btn {
+  background: rgba(239, 68, 68, 0.4);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: white;
+}
+
+.archive-btn {
+  background: rgba(245, 158, 11, 0.2); /* Amber */
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
 .delete-btn:hover {
   background: #ef4444;
   border-color: #ef4444;
   transform: scale(1.05);
   box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.archive-btn:hover {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
 }
 
 .archived-project {
@@ -528,3 +545,165 @@ button.primary:hover {
   white-space: nowrap;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* ─── Flatpickr Dark Theme Override ─────────────────────────────────────────── */
+.flatpickr-calendar {
+  background: #131727 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99,102,241,0.15) !important;
+  font-family: 'Inter', sans-serif !important;
+  overflow: hidden;
+  padding-bottom: 0.5rem;
+}
+
+.flatpickr-months {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 0.5rem 0;
+  border-radius: 13px 13px 0 0;
+}
+
+.flatpickr-month {
+  color: #e0e7ff !important;
+  fill: #e0e7ff !important;
+}
+
+.flatpickr-prev-month, .flatpickr-next-month {
+  color: #a5b4fc !important;
+  fill: #a5b4fc !important;
+  transition: color 0.2s, fill 0.2s;
+}
+.flatpickr-prev-month:hover, .flatpickr-next-month:hover {
+  color: white !important;
+  fill: white !important;
+}
+
+.flatpickr-current-month {
+  color: #e0e7ff !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+.flatpickr-current-month .numInputWrapper input,
+.flatpickr-current-month select {
+  color: #e0e7ff !important;
+  background: transparent !important;
+}
+
+.flatpickr-weekdays {
+  background: transparent !important;
+}
+
+span.flatpickr-weekday {
+  color: #6366f1 !important;
+  font-weight: 700 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em;
+}
+
+.flatpickr-day {
+  color: #d1d5db !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.flatpickr-day:hover {
+  background: rgba(99, 102, 241, 0.2) !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
+  color: white !important;
+}
+
+/* Today */
+.flatpickr-day.today {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  color: #a5b4fc !important;
+  font-weight: 700;
+}
+
+/* Start of range */
+.flatpickr-day.startRange,
+.flatpickr-day.startRange:hover {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+  color: white !important;
+  border-radius: 8px 0 0 8px !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+}
+
+/* End of range */
+.flatpickr-day.endRange,
+.flatpickr-day.endRange:hover {
+  background: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  color: white !important;
+  border-radius: 0 8px 8px 0 !important;
+  box-shadow: 0 0 0 3px rgba(20,184,166,0.3);
+}
+
+/* Start = End (single day selected) */
+.flatpickr-day.startRange.endRange {
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #6366f1, #14b8a6) !important;
+}
+
+/* Days in between */
+.flatpickr-day.inRange {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border-color: transparent !important;
+  color: #c7d2fe !important;
+  border-radius: 0 !important;
+  box-shadow: -5px 0 0 rgba(99,102,241,0.12), 5px 0 0 rgba(99,102,241,0.12) !important;
+}
+
+/* Weekends (visual-only, not disabled, so range works across them) */
+.flatpickr-day.flatpickr-weekend {
+  color: rgba(255, 255, 255, 0.18) !important;
+  font-style: italic;
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+.flatpickr-day.flatpickr-weekend:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: transparent !important;
+}
+/* Keep weekends muted even when in-range */
+.flatpickr-day.flatpickr-weekend.inRange {
+  background: rgba(99, 102, 241, 0.06) !important;
+  color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Actually disabled days (maxDate limit etc.) */
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+  color: rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  cursor: not-allowed;
+}
+
+/* Prev/next month days */
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+  color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Calendar arrow on input */
+.flatpickr-calendar.arrowTop:before,
+.flatpickr-calendar.arrowTop:after {
+  border-bottom-color: #131727 !important;
+}
+
+/* Hide the hidden compatibility date inputs */
+#editStartDate,
+#editEndDate {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+

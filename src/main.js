@@ -12,7 +12,8 @@ import {
   archiveProject,
   restoreProject,
   deleteProjectPermanently,
-  getUserRole
+  getUserRole,
+  subscribeToLogs
 } from './data.js';
 import {
   onAuthStateChanged,
@@ -39,6 +40,8 @@ let appState = {
   expandedProjects: new Set(),
   currentUser: null,
   currentUserRole: null,
+  logs: [],
+  currentView: 'main', // 'main' or 'logs'
 };
 
 // DOM Elements
@@ -161,10 +164,24 @@ async function init() {
     
     render();
   });
-  // Migration completely resolved; skipping one-time migration script
+
+
 
   setupEventListeners();
   setupAuthListeners();
+
+  // Subscribe to real-time updates: LOGS
+  subscribeToLogs(db, (logs) => {
+    appState.logs = logs;
+    if (appState.currentView === 'logs') {
+      renderLogs();
+    }
+  });
+
+  // Handle initial hash
+  if (window.location.hash === '#logs') {
+    window.showLogsView();
+  }
 }
 
 // ─── Auth UI ────────────────────────────────────────────────────────────────
@@ -184,12 +201,22 @@ function applyAuthUI(user) {
     if (userAvatar) userAvatar.textContent = user.email[0].toUpperCase();
     if (addProjectBtn) addProjectBtn.style.display = '';
     if (backupBtn) backupBtn.style.display = 'flex';
+    
+    // Only show Logs button for admins (or anyone logged in if you prefer)
+    const showLogsBtn = document.getElementById('showLogsBtn');
+    if (showLogsBtn) showLogsBtn.style.display = 'flex';
   } else {
     // Logged out
     if (loginBtn)  loginBtn.style.display  = 'flex';
     if (userInfo)  userInfo.style.display  = 'none';
     if (addProjectBtn) addProjectBtn.style.display = 'none';
     if (backupBtn) backupBtn.style.display = 'none';
+    
+    const showLogsBtn = document.getElementById('showLogsBtn');
+    if (showLogsBtn) showLogsBtn.style.display = 'none';
+    
+    // If we were in logs view, go back to main
+    if (appState.currentView === 'logs') window.showMainView();
   }
 }
 
@@ -516,10 +543,16 @@ function renderGantt() {
           return `<div style="position:absolute; left:${leftPct}%; width:${wPct}%; height:100%; background:${color}; z-index:1; border-radius:999px;"></div>`;
         }).join('');
 
+        const responsibleInitials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        
         return `<td colspan="${span}" style="padding:0.5rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
-          <div style="position:relative; background:${color}33; border-radius:999px; height:30px; display:flex; align-items:center; overflow:hidden; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
+          <div style="position:relative; background:${color}33; border-radius:999px; height:30px; display:flex; align-items:center; overflow:visible; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
             ${phasesHtml}
             <div style="position:relative; z-index:2; padding:0 1rem; font-size:0.72rem; font-weight:600; color:white; white-space:nowrap;">${proj.overallProgress}%</div>
+            
+            <div style="position:absolute; right:-15px; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:50%; background:${color}; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:white; z-index:3; border:2px solid var(--bg-color); box-shadow:0 0 10px rgba(0,0,0,0.3);" title="${proj.responsible || 'Sin asignar'}">
+              ${responsibleInitials}
+            </div>
           </div>
         </td>`;
       }
@@ -527,7 +560,7 @@ function renderGantt() {
       return `<td style="border-left:1px solid rgba(255,255,255,0.04);"></td>`;
     }).join('');
 
-    const ganttSafeId = proj.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const ganttSafeId = proj.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
     return `<tr style="height:${ROW_H}px;">
       <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 1rem; font-size:0.8rem; font-weight:600; background:${color}22; border-right:3px solid ${color}; position:sticky; left:0; z-index:2; overflow:visible; white-space:normal; line-height:1.2;">
         <span
@@ -709,8 +742,8 @@ function renderProjects() {
     const sortedActive = appState.projects.filter(p => !p.isArchived).sort(sortFn);
     const sortedArchived = appState.projects.filter(p => p.isArchived).sort(sortFn);
     
-    appState.frozenActiveIds = sortedActive.map(p => p.name);
-    appState.frozenArchivedIds = sortedArchived.map(p => p.name);
+    appState.frozenActiveIds = sortedActive.map(p => p.id);
+    appState.frozenArchivedIds = sortedArchived.map(p => p.id);
     appState.needsResort = false;
     console.log(`main.js: Orden congelado para ${appState.frozenActiveIds.length} proyectos activos.`);
   }
@@ -718,12 +751,9 @@ function renderProjects() {
   // Use the frozen order to sort the current (filtered) projects
   const applyFrozenOrder = (list, frozenIds) => {
     return list.sort((a, b) => {
-      let idxA = frozenIds.indexOf(a.name);
-      let idxB = frozenIds.indexOf(b.name);
+      let idxA = frozenIds.indexOf(a.id);
+      let idxB = frozenIds.indexOf(b.id);
       
-      if (idxA === -1) console.log(`main.js: ID NO ENCONTRADO para "${a.name}" en lista de ${frozenIds.length} IDs.`);
-      
-      // Fallback for truly new projects not yet in our frozen memory
       if (idxA === -1 && idxB === -1) return (b.lastModified || 0) - (a.lastModified || 0);
       if (idxA === -1) return -1; 
       if (idxB === -1) return 1;
@@ -753,9 +783,9 @@ function renderProjects() {
 }
 
 function renderProjectCard(proj, index, isArchived) {
-  const globalIndex = appState.projects.findIndex(p => p.name === proj.name);
+  const globalIndex = appState.projects.findIndex(p => p.id === proj.id);
   const projColor = GANTT_COLORS[globalIndex % GANTT_COLORS.length];
-  const safeId = proj.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const safeId = proj.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
   const isExpanded = appState.expandedProjects.has(safeId);
   const canEdit = !!appState.currentUser;
 
@@ -764,33 +794,48 @@ function renderProjectCard(proj, index, isArchived) {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
       <div>
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
-          <h3 ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.name}', 'name')"` : ''}
+          <h3 ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.id}', 'name')"` : ''}
               onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
               style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0; min-width: 100px;">${proj.name}</h3>
           <span class="badge ${getStatusClass(proj.status)}">${proj.status}</span>
         </div>
-        <div style="color: var(--text-muted); font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-          <span ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.name}', 'responsible')"` : ''}
-                onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
-                style="min-width: 80px;">${proj.responsible || 'Sin asignar'}</span>
+        <div style="display: flex; align-items: center; gap: 1rem; color: var(--text-muted); font-size: 0.875rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <span ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.id}', 'responsible')"` : ''}
+                  onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
+                  style="min-width: 80px;">${proj.responsible || 'Sin asignar'}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            ${canEdit && !isArchived ? `
+              <select class="editable-field" style="background: transparent; border: none; color: inherit; cursor: pointer; padding: 0; outline: none; appearance: none; -webkit-appearance: none; font-family: inherit; font-size: inherit;" onchange="window.handleClientChange('${proj.id}', this.value)">
+                ${appState.clients.map(c => `<option value="${c.name}" ${c.name === proj.client ? 'selected' : ''} style="background: var(--bg-color); color: var(--text-main);">${c.name}</option>`).join('')}
+              </select>
+            ` : `
+              <span>${proj.client || 'General'}</span>
+            `}
+          </div>
         </div>
       </div>
 
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
         ${canEdit
           ? (!isArchived
-              ? `<button class="delete-btn js-archive-project" 
-                        data-project="${proj.name}"
-                        title="Archivar Proyecto">Eliminar</button>`
+              ? `<button class="archive-btn js-archive-project" 
+                        data-project-id="${proj.id}"
+                        data-project-name="${proj.name}"
+                        title="Archivar Proyecto">Archivar</button>`
               : `
                 <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
                   <button class="restore-btn js-restore-project" 
-                          data-project="${proj.name}"
+                          data-project-id="${proj.id}"
+                          data-project-name="${proj.name}"
                           title="Restaurar Proyecto">Restaurar</button>
                   ${appState.currentUserRole === 'admin' ? `
                   <button class="delete-btn js-delete-permanent" 
-                          data-project="${proj.name}"
+                          data-project-id="${proj.id}"
+                          data-project-name="${proj.name}"
                           style="background: var(--status-alert); padding: 0.25rem 0.5rem; font-size: 0.7rem;" 
                           title="Eliminar para siempre">Borrar Permanentemente</button>
                   ` : ''}
@@ -963,11 +1008,12 @@ window.toggleProjectGantt = function(safeId) {
   }
 };
 
-window.handleMetaBlur = async function(el, oldName, field) {
+window.handleMetaBlur = async function(el, projectId, field) {
   const newValue = el.innerText.replace(/\s+/g, ' ').trim();
-  const proj = appState.projects.find(p => p.name === oldName);
+  const proj = appState.projects.find(p => p.id === projectId);
   if (!proj) return;
 
+  const oldName = proj.name; // Current name before update
   const newName = field === 'name' ? newValue : proj.name;
   const newResp = field === 'responsible' ? newValue : proj.responsible;
 
@@ -977,35 +1023,39 @@ window.handleMetaBlur = async function(el, oldName, field) {
   }
 
   // Update frozen IDs optimistically to maintain visual position even after rename
-  if (field === 'name' && newName !== oldName) {
-    if (appState.frozenActiveIds) {
-      const idx = appState.frozenActiveIds.indexOf(oldName);
-      if (idx !== -1) appState.frozenActiveIds[idx] = newName;
-    }
-    if (appState.frozenArchivedIds) {
-      const idx = appState.frozenArchivedIds.indexOf(oldName);
-      if (idx !== -1) appState.frozenArchivedIds[idx] = newName;
-    }
-  }
+  // Note: We now use projectId for frozen IDs, so renaming the name doesn't affect the ID
+  // Unless the ID was derived from the name (legacy). But we've switched to projectId.
 
   try {
-    await updateProjectMeta(db, oldName, newName, newResp);
+    await updateProjectMeta(db, projectId, newName, newResp, proj.client);
   } catch (err) {
     console.error("Error updating meta:", err);
-    // Rollback frozen IDs on error if needed (simpler: just set needsResort = true)
     appState.needsResort = true;
     el.innerText = field === 'name' ? proj.name : proj.responsible;
     alert("Error al actualizar. Se han restaurado los valores originales.");
   }
 };
 
-window.confirmArchiveProject = async function(projectName) {
+window.handleClientChange = async function(projectId, newClient) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+  
+  try {
+    await updateProjectMeta(db, proj.id, proj.name, proj.responsible, newClient);
+    appState.needsResort = true;
+  } catch (err) {
+    console.error("Error updating client:", err);
+    alert("Error al actualizar el cliente.");
+  }
+};
+
+window.confirmArchiveProject = async function(projectId, projectName) {
   const title = "Archivar Proyecto";
   const message = `¿Deseas enviar el proyecto "${projectName}" a la papelera? Podrás restaurarlo más tarde si es necesario.`;
   
   showConfirmModal(title, message, async () => {
     try {
-      await archiveProject(db, projectName);
+      await archiveProject(db, projectId, appState.currentUser);
       appState.needsResort = true; // Refresh frozen lists after move
     } catch (err) {
       console.error("Error archiving project:", err);
@@ -1053,8 +1103,8 @@ function showConfirmModal(title, message, onConfirm) {
   modal.classList.add('active');
 }
 
-window.confirmDeleteProjectPermanently = async function(projectName) {
-  console.log("main.js: confirmDeleteProjectPermanently invocado para:", JSON.stringify(projectName));
+window.confirmDeleteProjectPermanently = async function(projectId, projectName) {
+  console.log("main.js: confirmDeleteProjectPermanently invocado para:", projectId);
   
   const title = "Eliminar de forma permanente";
   const message = `¿Estás completamente seguro de eliminar el proyecto "${projectName}"?\n\nEsta acción borrará todos los registros de la base de datos y NO se puede deshacer.`;
@@ -1063,7 +1113,7 @@ window.confirmDeleteProjectPermanently = async function(projectName) {
     console.log("main.js: Eliminación confirmada en modal.");
     try {
       showLoading();
-      await deleteProjectPermanently(db, projectName);
+      await deleteProjectPermanently(db, projectId, appState.currentUser);
       
       const safeId = projectName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       appState.expandedProjects.delete(safeId);
@@ -1077,13 +1127,13 @@ window.confirmDeleteProjectPermanently = async function(projectName) {
   });
 };
 
-window.confirmRestoreProject = async function(projectName) {
+window.confirmRestoreProject = async function(projectId, projectName) {
   const title = "Restaurar Proyecto";
   const message = `¿Deseas restaurar "${projectName}"? El proyecto dejará de estar en la papelera y volverá a ser un proyecto activo.`;
   
   showConfirmModal(title, message, async () => {
     try {
-      await restoreProject(db, projectName);
+      await restoreProject(db, projectId, appState.currentUser);
       appState.needsResort = true; // Refresh frozen lists after move
     } catch (err) {
       console.error("Error restoring project:", err);
@@ -1098,6 +1148,18 @@ function setupEventListeners() {
     renderProjects();
   });
 
+  document.getElementById('showLogsBtn')?.addEventListener('click', () => {
+    window.showLogsView();
+  });
+
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash === '#logs') {
+      window.showLogsView();
+    } else if (window.location.hash === '' || window.location.hash === '#') {
+      window.showMainView();
+    }
+  });
+
   closeModalBtn.addEventListener('click', closeModal);
   cancelBtn.addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', (e) => {
@@ -1108,19 +1170,19 @@ function setupEventListeners() {
   document.addEventListener('click', (e) => {
     const permBtn = e.target.closest('.js-delete-permanent');
     if (permBtn) {
-      window.confirmDeleteProjectPermanently(permBtn.dataset.project);
+      window.confirmDeleteProjectPermanently(permBtn.dataset.projectId, permBtn.dataset.projectName);
       return;
     }
     
     const restoreBtn = e.target.closest('.js-restore-project');
     if (restoreBtn) {
-      window.confirmRestoreProject(restoreBtn.dataset.project);
+      window.confirmRestoreProject(restoreBtn.dataset.projectId, restoreBtn.dataset.projectName);
       return;
     }
 
     const archiveBtn = e.target.closest('.js-archive-project');
     if (archiveBtn) {
-      window.confirmArchiveProject(archiveBtn.dataset.project);
+      window.confirmArchiveProject(archiveBtn.dataset.projectId, archiveBtn.dataset.projectName);
       return;
     }
   });
@@ -1137,30 +1199,58 @@ function setupEventListeners() {
     }
   });
 
-  const startDateInput = document.getElementById('editStartDate');
-  const endDateInput = document.getElementById('editEndDate');
+  const dateRangeInput = document.getElementById('editDateRange');
+  const displayStart   = document.getElementById('displayStartDate');
+  const displayEnd     = document.getElementById('displayEndDate');
 
-  // Initialize Flatpickr
-  appState.fpStart = flatpickr("#editStartDate", {
+  // Format a YYYY-MM-DD string as DD/MM/YYYY for display
+  function fmtDisplay(yyyymmdd) {
+    if (!yyyymmdd) return '—';
+    const [y, m, d] = yyyymmdd.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  // Initialize single Flatpickr range picker
+  appState.fpRange = flatpickr("#editDateRange", {
+    mode: "range",
     altInput: true,
     altFormat: "d/m/Y",
     dateFormat: "Y-m-d",
-    disable: [
-      (date) => (date.getDay() === 0 || date.getDay() === 6)
-    ],
-    onChange: (selectedDates, dateStr) => {
-      appState.fpEnd.set('minDate', dateStr);
+    locale: {
+      rangeSeparator: " → "
+    },
+    onDayCreate: (dObj, dStr, fp, dayElem) => {
+      const dow = dayElem.dateObj.getDay();
+      if (dow === 0 || dow === 6) {
+        dayElem.classList.add('flatpickr-weekend');
+      }
+    },
+    onChange: (selectedDates) => {
+      const startVal = selectedDates[0] ? selectedDates[0].toLocaleDateString('en-CA') : '';
+      const endVal   = selectedDates[1] ? selectedDates[1].toLocaleDateString('en-CA') : '';
+
+      // Keep hidden inputs in sync
+      document.getElementById('editStartDate').value = startVal;
+      document.getElementById('editEndDate').value   = endVal;
+
+      // Update the display badges
+      if (displayStart) displayStart.textContent = fmtDisplay(startVal) || '—';
+      if (displayEnd)   displayEnd.textContent   = fmtDisplay(endVal)   || '—';
+
+      // Clear errors while picking
+      document.getElementById('dateError').style.display = 'none';
     }
   });
 
-  appState.fpEnd = flatpickr("#editEndDate", {
-    altInput: true,
-    altFormat: "d/m/Y",
-    dateFormat: "Y-m-d",
-    disable: [
-      (date) => (date.getDay() === 0 || date.getDay() === 6)
-    ]
-  });
+  // Compatibility shims so the rest of the code still works
+  appState.fpStart = {
+    setDate: (v) => {},
+    set: (k, v) => {
+      if (k === 'maxDate') appState.fpRange.set('maxDate', v);
+      if (k === 'minDate') appState.fpRange.set('minDate', v);
+    }
+  };
+  appState.fpEnd = appState.fpStart;
 
   editForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1169,19 +1259,21 @@ function setupEventListeners() {
     const newState = document.getElementById('editState').value;
     const newProgress = parseInt(editProgressRange.value, 10);
     const newComment = document.getElementById('editComment').value;
-    const newStartDate = fromInputDate(startDateInput.value);
-    const newEndDate = fromInputDate(endDateInput.value);
+    const startDateVal = document.getElementById('editStartDate').value;
+    const endDateVal   = document.getElementById('editEndDate').value;
+    const newStartDate = fromInputDate(startDateVal);
+    const newEndDate = fromInputDate(endDateVal);
 
     // Validate start > end
-    if (startDateInput.value && endDateInput.value && startDateInput.value > endDateInput.value) {
+    if (startDateVal && endDateVal && startDateVal > endDateVal) {
       document.getElementById('dateError').style.display = 'block';
       return;
     }
     document.getElementById('dateError').style.display = 'none';
 
     // Validate against project's delivery date
-    const maxAllowed = startDateInput.max; // set from Entrega phase endDate
-    const dateToCheck = endDateInput.value || startDateInput.value;
+    const maxAllowed = document.getElementById('editStartDate').max;
+    const dateToCheck = endDateVal || startDateVal;
     if (maxAllowed && dateToCheck && dateToCheck > maxAllowed) {
       const deliveryErrorEl = document.getElementById('deliveryError');
       if (deliveryErrorEl) deliveryErrorEl.style.display = 'block';
@@ -1348,30 +1440,28 @@ window.openEditModal = function(phaseId) {
   document.getElementById('editStartDate').value = toInputDate(phase.startDate);
   document.getElementById('editEndDate').value = toInputDate(phase.endDate);
 
-  // Update Flatpickr instances
-  appState.fpStart.setDate(toInputDate(phase.startDate));
-  appState.fpEnd.setDate(toInputDate(phase.endDate));
-
-  // Set max date based on the project's Entrega end date
-  // (only applies to phases that are NOT Entrega itself)
+  // Compute max date from the project's Entrega phase (if not editing Entrega itself)
   const isEntrega = phase.phase === 'Entrega';
   const entregaPhase = isEntrega
     ? null
     : appState.rawPhases.find(p => p.project === phase.project && p.phase === 'Entrega');
-  
   const maxDateVal = entregaPhase ? toInputDate(entregaPhase.endDate) : '';
-  
-  appState.fpStart.set('maxDate', maxDateVal);
-  appState.fpEnd.set('maxDate', maxDateVal);
-  
-  // Set native max for consistency in submit handler validation
-  const startDateInput = document.getElementById('editStartDate');
-  const endDateInput = document.getElementById('editEndDate');
-  startDateInput.max = maxDateVal;
-  endDateInput.max = maxDateVal;
-  
-  // Also set minDate for end to the start
-  appState.fpEnd.set('minDate', toInputDate(phase.startDate));
+
+  // Set max/min constraints on range picker
+  appState.fpRange.set('maxDate', maxDateVal || null);
+  // Set initial range
+  if (toInputDate(phase.startDate) || toInputDate(phase.endDate)) {
+    const dates = [toInputDate(phase.startDate), toInputDate(phase.endDate)].filter(Boolean);
+    appState.fpRange.setDate(dates);
+  } else {
+    appState.fpRange.clear();
+  }
+
+  // Update display badges
+  const displayStart = document.getElementById('displayStartDate');
+  const displayEnd   = document.getElementById('displayEndDate');
+  if (displayStart) displayStart.textContent = phase.startDate || '—';
+  if (displayEnd)   displayEnd.textContent   = phase.endDate   || '—';
 
   // Update the delivery error text to show the limit date
   const deliveryErrorEl = document.getElementById('deliveryError');
@@ -1388,6 +1478,59 @@ window.openEditModal = function(phaseId) {
 
 function closeModal() {
   modalOverlay.classList.remove('active');
+}
+
+window.showLogsView = function() {
+  appState.currentView = 'logs';
+  window.location.hash = 'logs';
+  
+  const mainMain = document.querySelector('main:not(#logsSection)');
+  const logsSection = document.getElementById('logsSection');
+  
+  if (mainMain) mainMain.style.display = 'none';
+  if (logsSection) logsSection.style.display = 'flex';
+  
+  renderLogs();
+};
+
+window.showMainView = function() {
+  appState.currentView = 'main';
+  window.location.hash = '';
+  
+  const mainMain = document.querySelector('main:not(#logsSection)');
+  const logsSection = document.getElementById('logsSection');
+  
+  if (mainMain) mainMain.style.display = 'flex';
+  if (logsSection) logsSection.style.display = 'none';
+  
+  render();
+};
+
+function renderLogs() {
+  const container = document.getElementById('logsTableBody');
+  if (!container) return;
+  
+  if (appState.logs.length === 0) {
+    container.innerHTML = `<tr><td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No hay registros de auditoría aún.</td></tr>`;
+    return;
+  }
+  
+  const getActionBadge = (action) => {
+    if (action === 'ARCHIVE') return '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);">Archivado</span>';
+    if (action === 'RESTORE') return '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">Restaurado</span>';
+    if (action === 'DELETE_PERMANENT') return '<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);">Borrado Físico</span>';
+    return action;
+  };
+
+  container.innerHTML = appState.logs.map(log => `
+    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+      <td style="padding: 1rem; color: var(--text-main); font-family: monospace; font-size: 0.85rem;">${log.date}</td>
+      <td style="padding: 1rem; color: var(--text-muted);">${log.userEmail}</td>
+      <td style="padding: 1rem;">${getActionBadge(log.action)}</td>
+      <td style="padding: 1rem; font-weight: 600;">${log.projectName}</td>
+      <td style="padding: 1rem; color: var(--text-muted);">${log.client || '—'}</td>
+    </tr>
+  `).join('');
 }
 
 // Phase card hover style (dynamic)

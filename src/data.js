@@ -8,12 +8,14 @@ import {
   onSnapshot,
   query,
   where,
-  getDoc
+  getDoc,
+  orderBy
 } from "firebase/firestore";
 
 const COLLECTION = "phases";
 const CLIENTS_COLLECTION = "clients";
 const ROLES_COLLECTION = "userRoles";
+const LOGS_COLLECTION = "audit_logs";
 
 // Initial data to seed Firestore if collection is empty
 export const initialData = [
@@ -53,8 +55,9 @@ export async function seedInitialDataIfEmpty(db) {
   if (!snapshot.empty) return; // Already seeded
 
   const promises = initialData.map(item => {
+    const projectId = item.project.toLowerCase().replace(/[^a-z0-9]/gi, '-');
     const id = `${item.project}-${item.phase}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    return setDoc(doc(db, COLLECTION, id), { ...item, id });
+    return setDoc(doc(db, COLLECTION, id), { ...item, id, projectId });
   });
 
   await Promise.all(promises);
@@ -94,29 +97,17 @@ export async function addClient(db, name) {
   await setDoc(clientRef, { name, id, createdAt: Date.now() });
 }
 
-export async function runMigrationToMutual(db) {
-  console.log("data.js: Iniciando migración masiva a 'Mutual'...");
-  const colRef = collection(db, COLLECTION);
-  const snapshot = await getDocs(colRef);
-  
-  const phasesToMigrate = snapshot.docs.filter(d => {
-    const data = d.data();
-    return data.client !== "Mutual";
+export function subscribeToLogs(db, callback) {
+  const colRef = collection(db, LOGS_COLLECTION);
+  const q = query(colRef, orderBy("timestamp", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const logs = snapshot.docs.map(d => d.data());
+    callback(logs);
   });
-
-  if (phasesToMigrate.length === 0) {
-    console.log("data.js: No hay fases que migrar.");
-    return;
-  }
-
-  const promises = phasesToMigrate.map(d => updateDoc(d.ref, { client: "Mutual" }));
-  await Promise.all(promises);
-  
-  // Also ensure Mutual client exists
-  await addClient(db, "Mutual");
-  
-  console.log(`data.js: Migración completada. ${phasesToMigrate.length} fases actualizadas.`);
 }
+
+
+
 
 /**
  * Updates a single phase document in Firestore.
@@ -133,11 +124,14 @@ export async function createNewProject(db, projectName, clientName = 'General', 
   const timestamp = Date.now();
   const selectedPhases = (phases && phases.length > 0) ? phases : ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega'];
   
+  const projectId = `proj-${timestamp}`;
+  
   const promises = selectedPhases.map(phaseName => {
     // Unique ID for each phase using timestamp to avoid collisions
     const id = `${projectName}-${phaseName}-${timestamp}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
     const phaseData = {
       id,
+      projectId,
       project: projectName,
       client: clientName,
       phase: phaseName,
@@ -157,24 +151,45 @@ export async function createNewProject(db, projectName, clientName = 'General', 
 }
 
 /**
+ * Records an action in the audit logs collection.
+ */
+export async function createAuditLog(db, user, action, projectDetails) {
+  if (!user) return;
+  const logRef = doc(collection(db, LOGS_COLLECTION));
+  await setDoc(logRef, {
+    timestamp: Date.now(),
+    date: new Date().toLocaleString('es-CL'),
+    userEmail: user.email,
+    userId: user.uid,
+    action: action, // 'ARCHIVE', 'RESTORE', 'DELETE_PERMANENT'
+    projectName: projectDetails.name,
+    projectId: projectDetails.id,
+    client: projectDetails.client
+  });
+}
+
+/**
  * Updates project-wide metadata (name or responsible) across all its phases.
  */
-export async function updateProjectMeta(db, oldName, newName, newResponsible) {
+export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient) {
   const finalNewName = (newName || '').replace(/\s+/g, ' ').trim();
-  const finalOldName = (oldName || '').replace(/\s+/g, ' ').trim();
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
   const phasesToUpdate = snapshot.docs
     .map(d => d.data())
-    .filter(p => p.project === oldName);
+    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId)); // Fallback for legacy
 
   const promises = phasesToUpdate.map(phase => {
     const phaseRef = doc(db, COLLECTION, phase.id);
-    return updateDoc(phaseRef, {
+    const updates = {
       project: finalNewName,
       responsible: newResponsible,
       lastModified: Date.now()
-    });
+    };
+    if (newClient !== undefined) {
+      updates.client = newClient;
+    }
+    return updateDoc(phaseRef, updates);
   });
 
   await Promise.all(promises);
@@ -183,11 +198,23 @@ export async function updateProjectMeta(db, oldName, newName, newResponsible) {
 /**
  * Soft-deletes a project by marking all its phases as archived.
  */
-export async function archiveProject(db, projectName) {
+export async function archiveProject(db, projectId, user) {
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
   const phasesToUpdate = snapshot.docs
-    .filter(d => d.data().project === projectName);
+    .filter(d => {
+      const data = d.data();
+      return data.projectId === projectId || (data.project === projectId && !data.projectId);
+    });
+
+  if (phasesToUpdate.length > 0) {
+    const projData = phasesToUpdate[0].data();
+    await createAuditLog(db, user, 'ARCHIVE', { 
+      id: projectId, 
+      name: projData.project, 
+      client: projData.client 
+    });
+  }
 
   const promises = phasesToUpdate.map(d => updateDoc(d.ref, { isArchived: true, lastModified: Date.now() }));
   await Promise.all(promises);
@@ -196,11 +223,23 @@ export async function archiveProject(db, projectName) {
 /**
  * Restores a soft-deleted project by removing the archived mark from its phases.
  */
-export async function restoreProject(db, projectName) {
+export async function restoreProject(db, projectId, user) {
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
   const phasesToUpdate = snapshot.docs
-    .filter(d => d.data().project === projectName);
+    .filter(d => {
+      const data = d.data();
+      return data.projectId === projectId || (data.project === projectId && !data.projectId);
+    });
+
+  if (phasesToUpdate.length > 0) {
+    const projData = phasesToUpdate[0].data();
+    await createAuditLog(db, user, 'RESTORE', { 
+      id: projectId, 
+      name: projData.project, 
+      client: projData.client 
+    });
+  }
 
   const promises = phasesToUpdate.map(d => updateDoc(d.ref, { isArchived: false, lastModified: Date.now() }));
   await Promise.all(promises);
@@ -209,16 +248,30 @@ export async function restoreProject(db, projectName) {
 /**
  * Permanently deletes a project by removing all its phase documents from Firestore.
  */
-export async function deleteProjectPermanently(db, projectName) {
-  console.log("data.js: Iniciando eliminación física de:", projectName);
+export async function deleteProjectPermanently(db, projectId, user) {
+  console.log("data.js: Iniciando eliminación física de:", projectId);
   const colRef = collection(db, COLLECTION);
-  const q = query(colRef, where("project", "==", projectName));
-  const snapshot = await getDocs(q);
+  // Try to query by projectId first
+  const q = query(colRef, where("projectId", "==", projectId));
+  let snapshot = await getDocs(q);
   
   if (snapshot.empty) {
-    console.warn("data.js: No se encontraron fases para el proyecto:", projectName);
+    // Fallback for legacy projects where the name was used as ID
+    const qLegacy = query(colRef, where("project", "==", projectId));
+    snapshot = await getDocs(qLegacy);
+  }
+
+  if (snapshot.empty) {
+    console.warn("data.js: No se encontraron fases para el proyecto:", projectId);
     return;
   }
+
+  const projData = snapshot.docs[0].data();
+  await createAuditLog(db, user, 'DELETE_PERMANENT', { 
+    id: projectId, 
+    name: projData.project, 
+    client: projData.client 
+  });
 
   console.log(`data.js: Borrando ${snapshot.size} documentos...`);
   const promises = snapshot.docs.map(d => deleteDoc(d.ref));
@@ -233,10 +286,13 @@ export function aggregateProjectData(phases) {
   const projects = {};
 
   phases.forEach(item => {
-    const projName = (item.project || '').replace(/\s+/g, ' ').trim();
-    if (!projects[projName]) {
-      projects[projName] = {
-        name: projName,
+    // Robust grouping using projectId if available, fallback to normalized project name
+    const groupingKey = item.projectId || (item.project || '').replace(/\s+/g, ' ').trim();
+    
+    if (!projects[groupingKey]) {
+      projects[groupingKey] = {
+        id: groupingKey,
+        name: (item.project || '').replace(/\s+/g, ' ').trim(),
         client: item.client || 'General',
         responsible: item.responsible,
         phases: [],
@@ -244,7 +300,7 @@ export function aggregateProjectData(phases) {
         status: 'No iniciado'
       };
     }
-    projects[projName].phases.push(item);
+    projects[groupingKey].phases.push(item);
   });
 
   // Sort phases in logical order
