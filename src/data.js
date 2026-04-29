@@ -17,7 +17,7 @@ const CLIENTS_COLLECTION = "clients";
 const ROLES_COLLECTION = "userRoles";
 const LOGS_COLLECTION = "audit_logs";
 
-// Initial data to seed Firestore if collection is empty
+// // Initial data to seed Firestore if collection is empty
 // export const initialData = [
 //   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '16/03/2026', endDate: '18/03/2026', state: 'En curso', progress: 0, comment: '' },
 //   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '19/03/2026', endDate: '24/03/2026', state: 'No iniciado', progress: 0, comment: '' },

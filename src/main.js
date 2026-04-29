@@ -1,7 +1,6 @@
 import './style.css';
 import { db, auth } from './firebase.js';
 import {
-  seedInitialDataIfEmpty,
   subscribeToPhases,
   subscribeToClients,
   addClient,
@@ -119,12 +118,6 @@ function showLoading() {
 // Initialize Application
 async function init() {
   showLoading();
-
-  try {
-    await seedInitialDataIfEmpty(db);
-  } catch (e) {
-    console.error("Error seeding data:", e);
-  }
 
   // Watch auth state
   onAuthStateChanged(auth, async (user) => {
