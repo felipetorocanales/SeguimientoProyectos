@@ -12,6 +12,7 @@
     "vite": "^8.0.0"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "firebase": "^12.10.0",
     "flatpickr": "^4.6.13"
   }

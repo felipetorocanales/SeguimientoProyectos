@@ -11,6 +11,78 @@
 </head>
 
 <body>
+  <!-- ═══ SPLASH SCREEN ═══ -->
+  <div id="startupSplashScreen" style="position:fixed;inset:0;z-index:100000;background:#050505;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:splashFadeOut 1.8s forwards;pointer-events:none;">
+    <div style="display:flex;align-items:center;justify-content:center;width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 32px rgba(99,102,241,0.5);margin-bottom:2.5rem;animation:splashPulse 1.5s ease-in-out;">
+      <svg width="40" height="40" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    </div>
+    <!-- Simple loading bar/spinner -->
+    <div style="width:140px;height:3px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;position:relative;">
+      <div style="position:absolute;top:0;left:0;height:100%;width:50%;background:#6366f1;border-radius:3px;animation:splashLoading 1.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;"></div>
+    </div>
+    <style>
+      @keyframes splashFadeOut {
+        0% { opacity: 1; visibility: visible; pointer-events: all; }
+        80% { opacity: 1; visibility: visible; pointer-events: all; }
+        100% { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+      @keyframes splashPulse {
+        0% { transform: scale(0.85); opacity: 0; }
+        20% { transform: scale(1.05); opacity: 1; }
+        40% { transform: scale(1); }
+        100% { transform: scale(1); }
+      }
+      @keyframes splashLoading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(200%); }
+      }
+    </style>
+  </div>
+
+  <!-- ═══ LOGIN SCREEN (shown until authenticated) ═══ -->
+  <div id="loginScreen" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0d0f17 0%,#161a2b 60%,#1a0f2e 100%);display:flex;align-items:center;justify-content:center;">
+    <div style="width:100%;max-width:420px;padding:2rem;">
+      <!-- Logo / Brand -->
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 32px rgba(99,102,241,0.4);margin-bottom:1.25rem;">
+          <svg width="32" height="32" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h1 style="font-size:2rem;font-weight:700;background:linear-gradient(to right,#e0e7ff,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.25rem;">Nexus Tracker</h1>
+        <p style="color:#6b7280;font-size:0.9rem;">Ingresa tus credenciales para continuar</p>
+      </div>
+      <!-- Login Card -->
+      <div style="background:rgba(26,31,53,0.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:2rem;box-shadow:0 24px 64px rgba(0,0,0,0.4);">
+        <form id="loginScreenForm" autocomplete="on">
+          <div style="margin-bottom:1.25rem;">
+            <label style="display:block;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;font-weight:500;">Correo electrónico</label>
+            <input type="email" id="loginScreenEmail" autocomplete="email" required
+              style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:0.8rem 1rem;color:#f3f4f6;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
+              placeholder="usuario@empresa.com"
+              onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'" />
+          </div>
+          <div style="margin-bottom:1.5rem;">
+            <label style="display:block;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;font-weight:500;">Contraseña</label>
+            <div style="position:relative;">
+              <input type="password" id="loginScreenPassword" autocomplete="current-password" required
+                style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:0.8rem 2.75rem 0.8rem 1rem;color:#f3f4f6;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
+                placeholder="••••••••"
+                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'" />
+              <button type="button" id="loginScreenTogglePwd"
+                style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;color:#6b7280;cursor:pointer;">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <p id="loginScreenError" style="display:none;color:#f87171;font-size:0.8rem;margin-bottom:1rem;padding:0.6rem 0.75rem;background:rgba(239,68,68,0.1);border-radius:8px;border-left:3px solid #f87171;"></p>
+          <button type="submit" id="loginScreenSubmitBtn"
+            style="width:100%;padding:0.85rem;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;border-radius:10px;color:white;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 16px rgba(99,102,241,0.35);letter-spacing:0.02em;"
+            onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(99,102,241,0.45)';"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(99,102,241,0.35)';">Iniciar sesión</button>
+        </form>
+      </div>
+      <p style="text-align:center;margin-top:1.5rem;color:#374151;font-size:0.78rem;">Acceso restringido · Solo usuarios autorizados</p>
+    </div>
+  </div>
   <div id="app">
     <header class="animate-fade-in" style="animation-delay: 0.1s">
       <div>
@@ -26,31 +98,36 @@
         <p class="subtitle" style="margin: 0;">Seguimiento de Proyectos</p>
       </div>
       <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <!-- Auth: shown when NOT logged in -->
-        <button id="loginBtn" class="primary"
-          style="display:none; background: linear-gradient(135deg, #6366f1, #4f46e5); gap: 0.5rem;">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
-          </svg>
-          Iniciar sesión
-        </button>
         <div id="userInfo" style="display:none; align-items:center; gap:0.5rem;">
+          <!-- Admin-only: Manage Users -->
+          <button id="manageUsersBtn"
+            style="display:none; font-size:0.75rem; padding:0.3rem 0.7rem; color:var(--text-muted); border-color:var(--card-border); gap: 0.4rem; align-items: center;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Usuarios
+          </button>
           <button id="showLogsBtn" 
-            style="display:none; font-size:0.75rem; padding:0.3rem 0.7rem; color:var(--text-muted); border-color:var(--card-border); margin-right: 0.5rem; gap: 0.4rem; align-items: center;">
+            style="display:none; font-size:0.75rem; padding:0.3rem 0.7rem; color:var(--text-muted); border-color:var(--card-border); gap: 0.4rem; align-items: center;">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
             Logs
           </button>
-          <div
-            style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;"
-            id="userAvatar">?</div>
-          <span id="userEmail"
-            style="font-size:0.8rem;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-          <button id="logoutBtn"
-            style="font-size:0.75rem;padding:0.3rem 0.7rem;color:var(--text-muted);border-color:var(--card-border);">Salir</button>
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;" id="userAvatar">?</div>
+          <span id="userEmail" style="font-size:0.8rem;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <button id="settingsBtn" 
+            style="font-size:0.75rem; padding:0.3rem 0.7rem; color:var(--text-muted); border-color:var(--card-border); gap: 0.4rem; align-items: center; display: flex;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Ajustes
+          </button>
+          <button id="logoutBtn" style="font-size:0.75rem;padding:0.3rem 0.7rem;color:var(--text-muted);border-color:var(--card-border);">Salir</button>
         </div>
       </div>
     </header>
+    
+    <!-- Floating Return Button -->
+    <button id="returnToGanttBtn" 
+            style="position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%) translateY(-100px); z-index: 1000; background: var(--accent-primary); color: white; padding: 0.6rem 1.2rem; border-radius: 999px; border: none; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.5); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; pointer-events: none;">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+      Volver al Cronograma
+    </button>
 
     <main>
       <!-- Client Navigation -->
@@ -75,12 +152,32 @@
             </svg>
             <h2 style="font-size: 1.1rem; font-weight: 600;">Cronograma Global</h2>
           </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.2); padding: 3px; border-radius: 8px; border: 1px solid var(--card-border);">
+            <button id="viewWeeksBtn" class="toggle-btn active" onclick="window.setGanttViewMode('weeks')">Semanas</button>
+            <button id="viewMonthsBtn" class="toggle-btn" onclick="window.setGanttViewMode('months')">Meses</button>
+          </div>
           <div id="statusFilters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
         </div>
         <div id="ganttChart" style="overflow-x: auto;">
           <!-- Gantt injected by JS -->
         </div>
       </section>
+
+      <!-- Workload Heatmap Section -->
+      <section id="workloadSection" class="glass-card animate-fade-in" style="margin-top: 2rem; animation-delay: 0.25s">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--status-alert)">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0;">Carga de Trabajo del Equipo</h2>
+          </div>
+        </div>
+        <div id="workloadHeatmap" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+          <!-- Heatmap cards injected by JS -->
+        </div>
+      </section>
+
 
       <!-- Projects List Section -->
       <section class="glass-card animate-fade-in" style="margin-top: 2rem; animation-delay: 0.3s">
@@ -116,6 +213,11 @@
 
           <div id="participantFilters" class="participant-filters"
             style="display: flex; gap: 0.4rem; align-items: center;"></div>
+
+          <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1); display: block;"
+            class="desktop-only-divider"></div>
+
+          <div id="statusFilters" style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;"></div>
 
           <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1); display: block;"
             class="desktop-only-divider"></div>
@@ -386,57 +488,114 @@
     </div>
   </div>
 
-  <!-- Login Modal -->
-  <div id="loginModal" class="modal-overlay">
+  <!-- User Management Modal (Admin only) -->
+  <div id="userMgmtModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:700px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;">
+            <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size:1.1rem;margin:0;">Gestión de Usuarios</h3>
+            <p style="font-size:0.78rem;color:var(--text-muted);margin:0;">Administra permisos y accesos al sistema</p>
+          </div>
+        </div>
+        <button id="closeUserMgmtBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- User List -->
+        <div id="userMgmtList" style="margin-bottom:1.5rem;"></div>
+        <!-- Add / Edit Form -->
+        <div id="userMgmtForm" style="background:rgba(0,0,0,0.2);border-radius:12px;padding:1.25rem;border:1px solid rgba(255,255,255,0.06);">
+          <h4 id="userFormTitle" style="font-size:0.9rem;font-weight:600;margin:0 0 1rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Agregar usuario</h4>
+          <input type="hidden" id="editingUserId" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div>
+              <label class="form-label">UID de Firebase Auth</label>
+              <input type="text" id="userUid" class="form-input" placeholder="uid del usuario en Firebase" />
+            </div>
+            <div>
+              <label class="form-label">Correo electrónico</label>
+              <input type="email" id="userEmail2" class="form-input" placeholder="usuario@empresa.com" />
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div>
+              <label class="form-label">Nombre para mostrar</label>
+              <input type="text" id="userDisplayName" class="form-input" placeholder="Nombre Apellido" />
+            </div>
+            <div>
+              <label class="form-label">Rol / Permiso</label>
+              <select id="userRole" class="form-select" onchange="window.onUserRoleChange()">
+                <option value="lector">Lector (solo visualización)</option>
+                <option value="editor" selected>Editor (puede editar)</option>
+                <option value="admin">Administrador (acceso total)</option>
+              </select>
+            </div>
+          </div>
+          <div id="allowedClientsSection" style="display:none;margin-bottom:1rem;">
+            <label class="form-label">Clientes permitidos (solo para Lector)</label>
+            <div id="allowedClientsList" style="display:flex;flex-wrap:wrap;gap:0.5rem;padding:0.75rem;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--card-border);"></div>
+          </div>
+          <p id="userMgmtError" style="display:none;color:#f87171;font-size:0.8rem;margin-bottom:0.75rem;"></p>
+          <div style="display:flex;justify-content:flex-end;gap:0.75rem;">
+            <button type="button" id="cancelUserFormBtn" class="glass-card" style="padding:0.5rem 1rem;font-size:0.85rem;">Cancelar</button>
+            <button type="button" id="saveUserBtn" class="primary" style="padding:0.5rem 1.25rem;font-size:0.85rem;">Guardar Usuario</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- AI Summary Tooltip -->
+  <div id="aiTooltip" style="position:fixed; z-index:99999; display:none; background:rgba(20,24,39,0.95); backdrop-filter:blur(10px); border:1px solid rgba(99,102,241,0.5); border-radius:12px; padding:1.25rem; width:320px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(99,102,241,0.2); pointer-events:none; transition:opacity 0.2s; opacity:0; color:var(--text-color);">
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:0.5rem;">
+      <svg width="18" height="18" fill="none" stroke="url(#gemini-gradient)" viewBox="0 0 24 24" stroke-width="2">
+        <defs>
+          <linearGradient id="gemini-gradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#ec4899"/>
+          </linearGradient>
+        </defs>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+      <h4 style="margin:0; font-size:0.95rem; font-weight:600; background:linear-gradient(to right,#3b82f6,#ec4899); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Análisis con IA</h4>
+    </div>
+    <div id="aiTooltipContent" style="font-size:0.85rem; line-height:1.5; color:var(--text-muted);">
+      Generando resumen...
+    </div>
+  </div>
+
+  <!-- Settings Modal (API Key) -->
+  <div id="settingsModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 420px;">
       <div class="modal-header">
         <div style="display:flex; align-items:center; gap:0.75rem;">
-          <div
-            style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;">
-            <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" />
-            </svg>
+          <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#8b5cf6,#6366f1);display:flex;align-items:center;justify-content:center;">
+            <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
           </div>
           <div>
-            <h3 style="font-size:1.1rem; margin:0;">Acceso al sistema</h3>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Solo usuarios autorizados</p>
+            <h3 style="font-size:1.1rem; margin:0;">Configuración</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Ajustes del sistema</p>
           </div>
         </div>
-        <button id="closeLoginBtn" class="close-btn">&times;</button>
+        <button id="closeSettingsBtn" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
-        <form id="loginForm" autocomplete="on">
+        <form id="settingsForm">
           <div class="form-group">
-            <label class="form-label" for="loginEmail">Correo electrónico</label>
-            <input type="email" id="loginEmail" class="form-input" placeholder="usuario@empresa.com"
-              autocomplete="email" required />
+            <label class="form-label" for="geminiApiKey">API Key de Gemini (Google AI)</label>
+            <input type="password" id="geminiApiKey" class="form-input" placeholder="AIzaSy..." />
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Requerida para los análisis automáticos de proyectos. Se almacena localmente en tu navegador.</p>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="loginPassword">Contraseña</label>
-            <div style="position:relative;">
-              <input type="password" id="loginPassword" class="form-input" placeholder="••••••••"
-                autocomplete="current-password" required style="padding-right:2.75rem;" />
-              <button type="button" id="togglePassword"
-                style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;color:var(--text-muted);cursor:pointer;">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </button>
-            </div>
+          <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="primary" style="padding: 0.6rem 1.5rem;">Guardar</button>
           </div>
-          <p id="loginError"
-            style="display:none; color:#f87171; font-size:0.8rem; margin:-0.5rem 0 1rem; padding:0.6rem 0.75rem; background:rgba(239,68,68,0.1); border-radius:6px; border-left:3px solid #f87171;">
-          </p>
-          <button type="submit" id="loginSubmitBtn" class="primary"
-            style="width:100%; justify-content:center; display:flex; align-items:center; gap:0.5rem; padding:0.75rem;">
-            Iniciar sesión
-          </button>
         </form>
       </div>
     </div>
   </div>
+
 </body>
 
 </html>

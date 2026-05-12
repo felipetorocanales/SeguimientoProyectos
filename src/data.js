@@ -16,6 +16,7 @@ const COLLECTION = "phases";
 const CLIENTS_COLLECTION = "clients";
 const ROLES_COLLECTION = "userRoles";
 const LOGS_COLLECTION = "audit_logs";
+const USERS_COLLECTION = "userRoles"; // same collection, users are identified by uid
 
 // // Initial data to seed Firestore if collection is empty
 // export const initialData = [
@@ -333,18 +334,75 @@ export function aggregateProjectData(phases) {
 }
 
 /**
- * Retrieves the user's role from Firestore.
+ * Retrieves the user's role and profile from Firestore.
+ * Returns an object: { role, allowedClients, displayName, email }
  */
 export async function getUserRole(db, uid) {
   try {
     const roleRef = doc(db, ROLES_COLLECTION, uid);
     const roleSnap = await getDoc(roleRef);
     if (roleSnap.exists()) {
-      return roleSnap.data().role || 'user';
+      const data = roleSnap.data();
+      return data.role || 'editor';
     }
-    return 'user';
+    return 'editor';
   } catch (error) {
     console.error("Error al obtener rol:", error);
-    return 'user';
+    return 'editor';
   }
+}
+
+/**
+ * Retrieves full user profile from Firestore.
+ * Returns: { uid, role, allowedClients, displayName, email }
+ */
+export async function getUserProfile(db, uid) {
+  try {
+    const roleRef = doc(db, USERS_COLLECTION, uid);
+    const roleSnap = await getDoc(roleRef);
+    if (roleSnap.exists()) {
+      return roleSnap.data();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error al obtener perfil:", error);
+    return null;
+  }
+}
+
+/**
+ * Subscribes to real-time user list from Firestore.
+ */
+export function subscribeToUsers(db, callback) {
+  const colRef = collection(db, USERS_COLLECTION);
+  return onSnapshot(colRef, (snapshot) => {
+    const users = snapshot.docs.map(d => d.data());
+    users.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+    callback(users);
+  });
+}
+
+/**
+ * Creates or updates a user profile in Firestore (does NOT create the Firebase Auth account).
+ * The Admin must create the Auth account separately via Firebase Console or Admin SDK.
+ * This stores the role/permissions for an existing UID.
+ */
+export async function saveUserProfile(db, uid, { email, displayName, role, allowedClients }) {
+  const userRef = doc(db, USERS_COLLECTION, uid);
+  await setDoc(userRef, {
+    uid,
+    email: email || '',
+    displayName: displayName || '',
+    role: role || 'editor',
+    allowedClients: allowedClients || [],
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
+/**
+ * Deletes a user profile from Firestore (does NOT delete the Firebase Auth account).
+ */
+export async function deleteUserProfile(db, uid) {
+  const userRef = doc(db, USERS_COLLECTION, uid);
+  await deleteDoc(userRef);
 }

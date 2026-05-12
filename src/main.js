@@ -12,13 +12,18 @@ import {
   restoreProject,
   deleteProjectPermanently,
   getUserRole,
-  subscribeToLogs
+  getUserProfile,
+  subscribeToLogs,
+  subscribeToUsers,
+  saveUserProfile,
+  deleteUserProfile
 } from './data.js';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut
 } from 'firebase/auth';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Application State
 let appState = {
@@ -34,13 +39,18 @@ let appState = {
   unsubscribe: null,
   selectedClient: null,
   clients: [],
+  allUsers: [],
   fpStart: null,
   fpEnd: null,
   expandedProjects: new Set(),
   currentUser: null,
-  currentUserRole: null,
+  currentUserRole: null,   // 'lector' | 'editor' | 'admin'
+  currentUserProfile: null, // full profile from Firestore
   logs: [],
-  currentView: 'main', // 'main' or 'logs'
+  currentView: 'main',
+  initialGanttScrollDone: false,
+  returnScrollPos: null,
+  ganttViewMode: 'weeks', // 'weeks' | 'months'
 };
 
 // DOM Elements
@@ -117,6 +127,7 @@ function showLoading() {
 
 // Initialize Application
 async function init() {
+  setupLoginScreen();
   showLoading();
 
   // Watch auth state
@@ -124,11 +135,15 @@ async function init() {
     appState.currentUser = user;
     if (user) {
       appState.currentUserRole = await getUserRole(db, user.uid);
+      appState.currentUserProfile = await getUserProfile(db, user.uid);
     } else {
       appState.currentUserRole = null;
+      appState.currentUserProfile = null;
     }
     applyAuthUI(user);
+    applyRoleRestrictions();
     render();
+    setupScrollEffects();
   });
 
   // Subscribe to real-time updates: PHASES
@@ -141,10 +156,7 @@ async function init() {
   // Subscribe to real-time updates: CLIENTS
   subscribeToClients(db, (clients) => {
     appState.clients = clients;
-    
-    // Set default client if none selected
     if (!appState.selectedClient && clients.length > 0) {
-      // Restore from localStorage first, then fallback to Mutual, then first
       const savedClient = localStorage.getItem('selectedClient');
       const restoredClient = savedClient && clients.find(c => c.name === savedClient);
       if (restoredClient) {
@@ -154,11 +166,13 @@ async function init() {
         appState.selectedClient = mutual ? mutual.name : clients[0].name;
       }
     }
-    
     render();
   });
 
-
+  // Subscribe to users (for admin panel)
+  subscribeToUsers(db, (users) => {
+    appState.allUsers = users;
+  });
 
   setupEventListeners();
   setupAuthListeners();
@@ -166,115 +180,164 @@ async function init() {
   // Subscribe to real-time updates: LOGS
   subscribeToLogs(db, (logs) => {
     appState.logs = logs;
-    if (appState.currentView === 'logs') {
-      renderLogs();
-    }
+    if (appState.currentView === 'logs') renderLogs();
   });
 
-  // Handle initial hash
-  if (window.location.hash === '#logs') {
-    window.showLogsView();
-  }
+  if (window.location.hash === '#logs') window.showLogsView();
 }
 
 // ─── Auth UI ────────────────────────────────────────────────────────────────
 function applyAuthUI(user) {
-  const loginBtn  = document.getElementById('loginBtn');
-  const userInfo  = document.getElementById('userInfo');
-  const userEmail = document.getElementById('userEmail');
-  const userAvatar = document.getElementById('userAvatar');
+  const loginScreen   = document.getElementById('loginScreen');
+  const userInfo      = document.getElementById('userInfo');
+  const userEmail     = document.getElementById('userEmail');
+  const userAvatar    = document.getElementById('userAvatar');
   const addProjectBtn = document.getElementById('addProjectBtn');
-  const backupBtn = document.getElementById('backupBtn');
+  const backupBtn     = document.getElementById('backupBtn');
+  const showLogsBtn   = document.getElementById('showLogsBtn');
+  const manageUsersBtn = document.getElementById('manageUsersBtn');
 
   if (user) {
-    // Logged in
-    if (loginBtn)  loginBtn.style.display  = 'none';
-    if (userInfo)  userInfo.style.display  = 'flex';
-    if (userEmail) userEmail.textContent   = user.email;
-    if (userAvatar) userAvatar.textContent = user.email[0].toUpperCase();
-    if (addProjectBtn) addProjectBtn.style.display = '';
-    if (backupBtn) backupBtn.style.display = 'flex';
-    
-    // Only show Logs button for admins (or anyone logged in if you prefer)
-    const showLogsBtn = document.getElementById('showLogsBtn');
-    if (showLogsBtn) showLogsBtn.style.display = 'flex';
+    // Hide full-page login screen
+    if (loginScreen) {
+      loginScreen.style.opacity = '0';
+      loginScreen.style.transition = 'opacity 0.4s ease';
+      setTimeout(() => { loginScreen.style.display = 'none'; }, 400);
+    }
+    if (userInfo) userInfo.style.display = 'flex';
+    const displayName = appState.currentUserProfile?.displayName || user.email;
+    if (userEmail) userEmail.textContent = displayName;
+    if (userAvatar) userAvatar.textContent = (displayName[0] || '?').toUpperCase();
+
+    const role = appState.currentUserRole;
+    // Editor & Admin can add projects and backup
+    if (addProjectBtn) addProjectBtn.style.display = (role === 'editor' || role === 'admin') ? '' : 'none';
+    if (backupBtn) backupBtn.style.display = (role === 'editor' || role === 'admin') ? 'flex' : 'none';
+    // Logs: editor + admin
+    if (showLogsBtn) showLogsBtn.style.display = (role === 'editor' || role === 'admin') ? 'flex' : 'none';
+    // Manage users: admin only
+    if (manageUsersBtn) manageUsersBtn.style.display = role === 'admin' ? 'flex' : 'none';
   } else {
-    // Logged out
-    if (loginBtn)  loginBtn.style.display  = 'flex';
-    if (userInfo)  userInfo.style.display  = 'none';
+    // Show full-page login screen
+    if (loginScreen) { loginScreen.style.display = 'flex'; loginScreen.style.opacity = '1'; }
+    if (userInfo) userInfo.style.display = 'none';
     if (addProjectBtn) addProjectBtn.style.display = 'none';
     if (backupBtn) backupBtn.style.display = 'none';
-    
-    const showLogsBtn = document.getElementById('showLogsBtn');
     if (showLogsBtn) showLogsBtn.style.display = 'none';
-    
-    // If we were in logs view, go back to main
+    if (manageUsersBtn) manageUsersBtn.style.display = 'none';
     if (appState.currentView === 'logs') window.showMainView();
   }
 }
 
-// ─── Auth Listeners ─────────────────────────────────────────────────────────
-function setupAuthListeners() {
-  const loginBtn     = document.getElementById('loginBtn');
-  const loginModal   = document.getElementById('loginModal');
-  const closeLoginBtn = document.getElementById('closeLoginBtn');
-  const loginForm    = document.getElementById('loginForm');
-  const loginError   = document.getElementById('loginError');
-  const loginSubmitBtn = document.getElementById('loginSubmitBtn');
-  const logoutBtn    = document.getElementById('logoutBtn');
-  const togglePwdBtn = document.getElementById('togglePassword');
-  const loginPassword = document.getElementById('loginPassword');
+// Apply data restrictions based on role (lector: filter by allowedClients)
+function applyRoleRestrictions() {
+  if (appState.currentUserRole === 'lector') {
+    const allowed = appState.currentUserProfile?.allowedClients || [];
+    // If the currently selected client is not in allowedClients, switch
+    if (allowed.length > 0 && !allowed.includes(appState.selectedClient)) {
+      appState.selectedClient = allowed[0];
+    }
+  }
+}
 
-  const openLoginModal = () => loginModal?.classList.add('active');
-  const closeLoginModal = () => {
-    loginModal?.classList.remove('active');
-    if (loginError) loginError.style.display = 'none';
-    if (loginForm) loginForm.reset();
-  };
+// ─── Scroll Effects ──────────────────────────────────────────────────────────
+function setupScrollEffects() {
+  const tabs = document.getElementById('clientTabs');
+  if (!tabs) return;
 
-  loginBtn?.addEventListener('click', openLoginModal);
-  closeLoginBtn?.addEventListener('click', closeLoginModal);
-  loginModal?.addEventListener('click', (e) => { if (e.target === loginModal) closeLoginModal(); });
+  let lastScrollY = window.scrollY;
+  const threshold = 80; // No esconder inmediatamente en el tope
 
-  // Toggle password visibility
-  togglePwdBtn?.addEventListener('click', () => {
-    if (!loginPassword) return;
-    loginPassword.type = loginPassword.type === 'password' ? 'text' : 'password';
+  window.addEventListener('scroll', () => {
+    const currentScrollY = window.scrollY;
+    
+    // Si bajamos y pasamos el umbral, escondemos
+    if (currentScrollY > lastScrollY && currentScrollY > threshold) {
+      tabs.classList.add('hidden');
+    } 
+    // Si subimos, mostramos
+    else {
+      tabs.classList.remove('hidden');
+    }
+    
+    lastScrollY = currentScrollY;
+  }, { passive: true });
+}
+
+// ─── Full-page Login Screen ──────────────────────────────────────────────────
+function setupLoginScreen() {
+  const form    = document.getElementById('loginScreenForm');
+  const errEl   = document.getElementById('loginScreenError');
+  const submitBtn = document.getElementById('loginScreenSubmitBtn');
+  const toggleBtn = document.getElementById('loginScreenTogglePwd');
+  const pwdInput  = document.getElementById('loginScreenPassword');
+
+  toggleBtn?.addEventListener('click', () => {
+    pwdInput.type = pwdInput.type === 'password' ? 'text' : 'password';
   });
 
-  // Login submit
-  loginForm?.addEventListener('submit', async (e) => {
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('loginEmail')?.value.trim();
-    const password = loginPassword?.value;
+    const email    = document.getElementById('loginScreenEmail').value.trim();
+    const password = pwdInput.value;
     if (!email || !password) return;
 
-    loginSubmitBtn.disabled = true;
-    loginSubmitBtn.textContent = 'Verificando...';
-    if (loginError) loginError.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Verificando...';
+    if (errEl) errEl.style.display = 'none';
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      closeLoginModal();
+      // applyAuthUI will hide the screen on auth state change
     } catch (err) {
       let msg = 'Error al iniciar sesión. Intenta de nuevo.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      if (['auth/user-not-found','auth/wrong-password','auth/invalid-credential'].includes(err.code)) {
         msg = 'Correo o contraseña incorrectos.';
       } else if (err.code === 'auth/too-many-requests') {
         msg = 'Demasiados intentos fallidos. Espera unos minutos.';
       } else if (err.code === 'auth/invalid-email') {
         msg = 'El formato del correo no es válido.';
       }
-      if (loginError) { loginError.textContent = msg; loginError.style.display = 'block'; }
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
     } finally {
-      loginSubmitBtn.disabled = false;
-      loginSubmitBtn.textContent = 'Iniciar sesión';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Iniciar sesión';
     }
   });
+}
 
+// ─── Auth Listeners ─────────────────────────────────────────────────────────
+function setupAuthListeners() {
   // Logout
-  logoutBtn?.addEventListener('click', async () => {
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     await signOut(auth);
+  });
+
+  // Open user management modal (admin only)
+  document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
+    openUserMgmtModal();
+  });
+  document.getElementById('closeUserMgmtBtn')?.addEventListener('click', closeUserMgmtModal);
+  document.getElementById('userMgmtModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('userMgmtModal')) closeUserMgmtModal();
+  });
+
+  document.getElementById('saveUserBtn')?.addEventListener('click', saveUser);
+  document.getElementById('cancelUserFormBtn')?.addEventListener('click', resetUserForm);
+
+  // Return to Gantt logic
+  document.getElementById('returnToGanttBtn')?.addEventListener('click', () => {
+    if (appState.returnScrollPos !== null) {
+      window.scrollTo({ top: appState.returnScrollPos, behavior: 'smooth' });
+      appState.returnScrollPos = null;
+      
+      const btn = document.getElementById('returnToGanttBtn');
+      if (btn) {
+        btn.style.transform = 'translateX(-50%) translateY(-100px)';
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+      }
+    }
   });
 }
 
@@ -284,6 +347,7 @@ function render() {
   renderGantt();
   renderStatusFilters();
   renderDashboard();
+  renderWorkloadHeatmap();
   renderProjects();
 }
 
@@ -346,6 +410,54 @@ function getWeeksForPhases(phases) {
   return weeks;
 }
 
+function monthStart(date) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function monthLabel(date) {
+  const m = MONTH_LABELS[date.getMonth()];
+  const y = date.getFullYear();
+  // Mostrar año solo si es Enero o si es el primer mes de la línea de tiempo
+  return `${m} '${String(y).substring(2)}`;
+}
+
+function getMonthsForPhases(phases) {
+  let allDates = [];
+  phases.forEach(p => {
+    const s = parseDate(p.startDate);
+    const e = parseDate(p.endDate);
+    if (s) allDates.push(s);
+    if (e) allDates.push(e);
+  });
+  if (allDates.length === 0) return [];
+  const minDate = monthStart(new Date(Math.min(...allDates)));
+  const maxDate = new Date(Math.max(...allDates));
+  const months = [];
+  const cursor = new Date(minDate);
+  while (cursor <= maxDate) {
+    months.push(new Date(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  months.push(new Date(cursor)); // buffer
+  return months;
+}
+
+function getGlobalTimeline() {
+  if (appState.ganttViewMode === 'months') {
+    return getMonthsForPhases(appState.rawPhases);
+  }
+  return getGlobalWeeks();
+}
+
+window.setGanttViewMode = function(mode) {
+  appState.ganttViewMode = mode;
+  appState.initialGanttScrollDone = false;
+  render();
+};
+
 function getGlobalWeeks() {
   return getWeeksForPhases(appState.rawPhases);
 }
@@ -356,14 +468,21 @@ function renderClientTabs() {
   const container = document.getElementById('clientTabs');
   if (!container) return;
 
-  const clients = appState.clients;
+  let clients = appState.clients;
+
+  // Lector: only show allowed clients
+  if (appState.currentUserRole === 'lector') {
+    const allowed = appState.currentUserProfile?.allowedClients || [];
+    clients = clients.filter(c => allowed.includes(c.name));
+  }
+
   if (clients.length === 0) {
     container.style.display = 'none';
     return;
   }
   container.style.display = 'flex';
 
-  const canEdit = !!appState.currentUser;
+  const canEdit = appState.currentUserRole === 'editor' || appState.currentUserRole === 'admin';
 
   const tabsHtml = clients.map(c => {
     const isActive = appState.selectedClient === c.name;
@@ -414,6 +533,16 @@ window.setClient = function(client) {
 window.scrollToProject = function(safeId) {
   const card = document.getElementById(`project-card-${safeId}`);
   if (!card) return;
+
+  // Guardar posición actual para poder volver
+  appState.returnScrollPos = window.scrollY;
+  const returnBtn = document.getElementById('returnToGanttBtn');
+  if (returnBtn) {
+    returnBtn.style.transform = 'translateX(-50%) translateY(0)';
+    returnBtn.style.opacity = '1';
+    returnBtn.style.pointerEvents = 'all';
+  }
+
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   // Brief highlight pulse to draw the eye
   card.style.transition = 'box-shadow 0.3s ease, outline 0.3s ease';
@@ -432,36 +561,44 @@ function getTodayX(weeks, labelW, colW) {
   if (!weeks || weeks.length === 0) return null;
 
   const now = new Date();
-  // Represent today as a y/m/d key — completely immune to DST timestamp issues
-  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-  const dateKey  = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-
-  // Find which week bucket today falls into by comparing date keys
+  const isMonths = appState.ganttViewMode === 'months';
+  
+  // Find which bucket today falls into
   const weekIdx = weeks.findIndex((w, i) => {
     const wStart = w;
-    const wEnd   = weeks[i + 1] ?? new Date(w.getTime() + 7 * 86400000);
-    // Compare date-only (ignores time/DST):
+    const wEnd   = weeks[i + 1] ?? (isMonths ? new Date(w.getFullYear(), w.getMonth() + 1, 1) : new Date(w.getTime() + 7 * 86400000));
+    
     const todayNum  = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
     const startNum  = wStart.getFullYear() * 10000 + (wStart.getMonth() + 1) * 100 + wStart.getDate();
-    const endD      = new Date(wEnd.getTime() - 1); // one ms before next week start
+    const endD      = new Date(wEnd.getTime() - 1);
     const endNum    = endD.getFullYear() * 10000 + (endD.getMonth() + 1) * 100 + endD.getDate();
     return todayNum >= startNum && todayNum <= endNum;
   });
 
   if (weekIdx === -1) return null;
 
-  // Day-of-week fraction using the same working-day scale as bars (5 days/column)
-  // dayOfWeek: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-  const dow = now.getDay();
-  let fraction;
-  if      (dow === 0) fraction = 0;        // Sunday  → start of week
-  else if (dow === 6) fraction = 1;        // Saturday → end of week
-  else                fraction = (dow - 1) / 5; // Mon→0, Tue→0.2 … Fri→0.8
-
-  // Return percentage based on total width to handle proportional scaling of the table
   const totalW = labelW + weeks.length * colW;
-  const currentX = labelW + (weekIdx * colW) + (fraction * colW);
-  return (currentX / totalW) * 100 + '%';
+  
+  if (isMonths) {
+    const startOfMonth = monthStart(now);
+    const nextMonth    = new Date(startOfMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const totalDays    = getWorkingDaysBetween(startOfMonth, new Date(nextMonth.getTime() - 86400000));
+    const currentDays  = getWorkingDaysBetween(startOfMonth, now);
+    const fraction     = currentDays / totalDays;
+    
+    const currentX = labelW + (weekIdx * colW) + (fraction * colW);
+    return (currentX / totalW) * 100 + '%';
+  } else {
+    const dow = now.getDay();
+    let fraction;
+    if      (dow === 0) fraction = 0;
+    else if (dow === 6) fraction = 1;
+    else                fraction = (dow - 1) / 5;
+
+    const currentX = labelW + (weekIdx * colW) + (fraction * colW);
+    return (currentX / totalW) * 100 + '%';
+  }
 }
 
 function renderGantt() {
@@ -473,39 +610,46 @@ function renderGantt() {
   
   if (!ganttEl || appState.rawPhases.length === 0) return;
 
-  const weeks = getGlobalWeeks();
-  if (weeks.length === 0) { ganttEl.innerHTML = ''; return; }
-  const totalWeeks = weeks.length;
-  const ROW_H = 52, COL_W = 80, LABEL_W = 240;
+  const timeline = getGlobalTimeline();
+  if (timeline.length === 0) { ganttEl.innerHTML = ''; return; }
+  
+  const isMonths = appState.ganttViewMode === 'months';
+  const totalCols = timeline.length;
+  const ROW_H = 52, COL_W = isMonths ? 100 : 80, LABEL_W = 240;
 
-  const headerCells = weeks.map(w =>
-    `<th style="min-width:${COL_W}px; padding: 0.6rem 0 0.6rem 6px; font-size:0.72rem; font-weight:600; color:var(--text-muted); text-align:left; background:rgba(0,0,0,0.25); border-left:1px solid var(--card-border); white-space:nowrap;">${weekLabel(w)}</th>`
+  const headerCells = timeline.map(d =>
+    `<th style="min-width:${COL_W}px; padding: 0.6rem 0 0.6rem 6px; font-size:0.72rem; font-weight:600; color:var(--text-muted); text-align:left; background:rgba(0,0,0,0.25); border-left:1px solid var(--card-border); white-space:nowrap;">${isMonths ? monthLabel(d) : weekLabel(d)}</th>`
   ).join('');
 
   const rowsHtml = activeProjects.map((proj, i) => {
     const phaseDates = proj.phases.flatMap(ph => [parseDate(ph.startDate), parseDate(ph.endDate)]).filter(Boolean);
     if (phaseDates.length === 0) return '';
-    const startWeek = weekStart(new Date(Math.min(...phaseDates)));
-    const endWeek   = weekStart(new Date(Math.max(...phaseDates)));
-    const startCol  = weeks.findIndex(w => w.getTime() === startWeek.getTime());
-    let   endCol    = weeks.findIndex(w => w.getTime() === endWeek.getTime());
-    if (endCol === -1) endCol = totalWeeks - 1;
-    const span  = Math.max(1, endCol - startCol + 1);
     
-    // Precise visual offset and width calculation (WORKING DAYS ONLY)
     const minPhaseDate = new Date(Math.min(...phaseDates));
     const maxPhaseDate = new Date(Math.max(...phaseDates));
     
+    const startBucket = isMonths ? monthStart(minPhaseDate) : weekStart(minPhaseDate);
+    const endBucket   = isMonths ? monthStart(maxPhaseDate) : weekStart(maxPhaseDate);
+    
+    const startCol  = timeline.findIndex(d => d.getTime() === startBucket.getTime());
+    let   endCol    = timeline.findIndex(d => d.getTime() === endBucket.getTime());
+    if (endCol === -1) endCol = totalCols - 1;
+    const span  = Math.max(1, endCol - startCol + 1);
+    
+    // Precise visual offset and width calculation (WORKING DAYS ONLY)
+    const nextBucketDate = timeline[endCol + 1] || (isMonths ? addDays(endBucket, 32) : addDays(endBucket, 7));
+    const spanEndDate = new Date(nextBucketDate.getTime() - 86400000);
+    const totalSpanWorkingDays = getWorkingDaysBetween(startBucket, spanEndDate);
+    
     let offsetDays = 0;
-    if (minPhaseDate > startWeek) {
-      offsetDays = Math.max(0, getWorkingDaysBetween(startWeek, minPhaseDate) - 1);
+    if (minPhaseDate > startBucket) {
+      offsetDays = Math.max(0, getWorkingDaysBetween(startBucket, minPhaseDate) - 1);
     }
     
     const durationDays = Math.max(1, getWorkingDaysBetween(minPhaseDate, maxPhaseDate));
-    const spanDays = span * 5; // 5 working days per week column
     
-    let offsetPercent = (offsetDays / spanDays) * 100;
-    let widthPercent = (durationDays / spanDays) * 100;
+    let offsetPercent = (offsetDays / totalSpanWorkingDays) * 100;
+    let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
     if (widthPercent + offsetPercent > 100) widthPercent = 100 - offsetPercent;
     
     let color = '#4b5563'; // Opaco para No iniciado
@@ -515,7 +659,7 @@ function renderGantt() {
       color = '#3b82f6'; // Azul
     }
 
-    const cells = weeks.map((_, ci) => {
+    const cells = timeline.map((_, ci) => {
       if (ci === startCol) {
         const phasesHtml = proj.phases.map((ph, idx) => {
           const phStart = parseDate(ph.startDate);
@@ -533,17 +677,17 @@ function renderGantt() {
           // Prevenir que se desborde del 100%
           if (leftPct + wPct > 100) wPct = 100 - leftPct;
           
-          return `<div style="position:absolute; left:${leftPct}%; width:${wPct}%; height:100%; background:${color}; z-index:1; border-radius:999px;"></div>`;
+          return `<div style="position:absolute; left:${leftPct}%; width:${wPct}%; height:100%; background:${color}; z-index:1; border-radius:6px;"></div>`;
         }).join('');
 
         const responsibleInitials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         
         return `<td colspan="${span}" style="padding:0.5rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
-          <div style="position:relative; background:${color}33; border-radius:999px; height:30px; display:flex; align-items:center; overflow:visible; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
+          <div style="position:relative; background:${color}33; border-radius:6px; height:30px; display:flex; align-items:center; overflow:visible; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
             ${phasesHtml}
             <div style="position:relative; z-index:2; padding:0 1rem; font-size:0.72rem; font-weight:600; color:white; white-space:nowrap;">${proj.overallProgress}%</div>
             
-            <div style="position:absolute; right:-15px; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:50%; background:${color}; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:white; z-index:3; border:2px solid var(--bg-color); box-shadow:0 0 10px rgba(0,0,0,0.3);" title="${proj.responsible || 'Sin asignar'}">
+            <div style="position:absolute; right:-10px; top:-12px; width:26px; height:26px; border-radius:50%; background:${color}; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; color:white; z-index:4; border:2px solid var(--bg-color); box-shadow:0 4px 10px rgba(0,0,0,0.4);" title="${proj.responsible || 'Sin asignar'}">
               ${responsibleInitials}
             </div>
           </div>
@@ -555,79 +699,105 @@ function renderGantt() {
 
     const ganttSafeId = proj.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
     return `<tr style="height:${ROW_H}px;">
-      <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 1rem; font-size:0.8rem; font-weight:600; background:${color}22; border-right:3px solid ${color}; position:sticky; left:0; z-index:2; overflow:visible; white-space:normal; line-height:1.2;">
-        <span
-          onclick="window.scrollToProject('${ganttSafeId}')"
-          style="cursor:pointer; display:block; transition:color 0.2s, text-shadow 0.2s;"
-          onmouseover="this.style.color='${color}'; this.style.textShadow='0 0 8px ${color}88';"
-          onmouseout="this.style.color=''; this.style.textShadow='';">
+      <td 
+        onclick="window.scrollToProject('${ganttSafeId}')"
+        onmouseenter="window.handleGanttHover(event, '${proj.id}')"
+        onmouseleave="window.handleGanttLeave(event)"
+        style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 1.25rem; font-size:0.85rem; font-weight:600; background: color-mix(in srgb, ${color} 10%, #111420); border-right:2px solid ${color}; position:sticky; left:0; z-index:5; overflow:visible; white-space:normal; line-height:1.3; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5); cursor:pointer; transition: background 0.2s;"
+      >
+        <span style="display:block; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); color:var(--text-main); pointer-events:none;">
           ${proj.name}
         </span>
       </td>
       ${cells}</tr>`;
   }).join('');
 
-  const todayX = getTodayX(weeks, LABEL_W, COL_W);
+  const todayX = getTodayX(timeline, LABEL_W, COL_W);
   const todayLine = todayX !== null ? `<div class="today-line" style="left:${todayX}; height: 100%;"></div>` : '';
 
-  const totalW = LABEL_W + totalWeeks * COL_W;
+  const totalW = LABEL_W + totalCols * COL_W;
   
   ganttEl.style.position = ''; // Remove relative from scroll container to prevent absolute element from breaking
   ganttEl.innerHTML = `
     <div style="position:relative; width:100%; min-width:${totalW}px;">
       ${todayLine}
       <table style="border-collapse:collapse; width:100%; table-layout:fixed;">
-      <colgroup><col style="width:${LABEL_W}px;">${weeks.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
+      <colgroup><col style="width:${LABEL_W}px;">${timeline.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
     <thead><tr>
-      <th style="position:sticky; left:0; z-index:3; background:rgba(13,15,23,0.95); min-width:${LABEL_W}px; padding:0.6rem 1rem; font-size:0.75rem; font-weight:600; color:var(--text-muted); text-align:left;">Proyecto</th>
+      <th style="position:sticky; left:0; z-index:6; background:#111420; min-width:${LABEL_W}px; padding:0.8rem 1.25rem; font-size:0.75rem; font-weight:700; color:var(--text-muted); text-align:left; border-right:1px solid var(--card-border); border-bottom:1px solid var(--card-border); text-transform:uppercase; letter-spacing:0.05em; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5);">Proyecto</th>
       ${headerCells}
     </tr></thead>
     <tbody style="background:rgba(0,0,0,0.1);">${rowsHtml}</tbody>
   </table>
   </div>`;
+
+  // Update toggle buttons in index.html if they exist
+  const weeksBtn = document.getElementById('viewWeeksBtn');
+  const monthsBtn = document.getElementById('viewMonthsBtn');
+  if (weeksBtn && monthsBtn) {
+    weeksBtn.classList.toggle('active', !isMonths);
+    monthsBtn.classList.toggle('active', isMonths);
+  }
+
+  // Center on today on initial load or view change
+  if (todayX !== null && !appState.initialGanttScrollDone) {
+    appState.initialGanttScrollDone = true;
+    requestAnimationFrame(() => {
+      const todayLineEl = ganttEl.querySelector('.today-line');
+      if (todayLineEl) {
+        const todayPos = todayLineEl.offsetLeft;
+        const containerWidth = ganttEl.clientWidth;
+        ganttEl.scrollLeft = todayPos - containerWidth / 2;
+      }
+    });
+  }
 }
 
 // ─── Per-Project Mini Gantt ────────────────────────────────────────────────
-function buildPhaseGanttTable(proj, weeks, projColor) {
-  if (!weeks || weeks.length === 0) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Sin datos de semanas.</p>';
-  const totalWeeks = weeks.length;
-  const COL_W = 80, LABEL_W = 200;
+function buildPhaseGanttTable(proj, timeline, projColor) {
+  if (!timeline || timeline.length === 0) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Sin datos de semanas.</p>';
+  const totalCols = timeline.length;
+  const isMonths = appState.ganttViewMode === 'months';
+  const COL_W = isMonths ? 100 : 80, LABEL_W = 200;
 
-  const headerCells = weeks.map(w =>
-    `<th style="min-width:${COL_W}px; padding:0.5rem 0 0.5rem 6px; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left; background:rgba(0,0,0,0.3); border-left:1px solid var(--card-border); white-space:nowrap;">${weekLabel(w)}</th>`
+  const headerCells = timeline.map(d =>
+    `<th style="min-width:${COL_W}px; padding:0.5rem 0 0.5rem 6px; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left; background:rgba(0,0,0,0.3); border-left:1px solid var(--card-border); white-space:nowrap;">${isMonths ? monthLabel(d) : weekLabel(d)}</th>`
   ).join('');
 
   const rowsHtml = proj.phases.map(phase => {
     const s = parseDate(phase.startDate);
     const e = parseDate(phase.endDate);
     if (!s || !e) return '';
-    const startWeek = weekStart(s);
-    const endWeek   = weekStart(e);
-    const startCol  = weeks.findIndex(w => w.getTime() === startWeek.getTime());
-    let   endCol    = weeks.findIndex(w => w.getTime() === endWeek.getTime());
-    if (endCol === -1) endCol = totalWeeks - 1;
+    const startBucket = isMonths ? monthStart(s) : weekStart(s);
+    const endBucket   = isMonths ? monthStart(e) : weekStart(e);
+    const startCol  = timeline.findIndex(d => d.getTime() === startBucket.getTime());
+    let   endCol    = timeline.findIndex(d => d.getTime() === endBucket.getTime());
+    if (endCol === -1) endCol = totalCols - 1;
     if (startCol === -1) return '';
     const span  = Math.max(1, endCol - startCol + 1);
     const color = PHASE_COLORS[phase.phase] || projColor;
 
     // Precise visual offset and width calculation (WORKING DAYS ONLY)
+    const nextBucketDate = timeline[endCol + 1] || (isMonths ? addDays(endBucket, 32) : addDays(endBucket, 7));
+    const spanEndDate = new Date(nextBucketDate.getTime() - 86400000);
+    const totalSpanWorkingDays = getWorkingDaysBetween(startBucket, spanEndDate);
+
     let offsetDays = 0;
-    if (s > startWeek) {
-      offsetDays = Math.max(0, getWorkingDaysBetween(startWeek, s) - 1);
+    if (s > startBucket) {
+      offsetDays = Math.max(0, getWorkingDaysBetween(startBucket, s) - 1);
     }
     
     const durationDays = Math.max(1, getWorkingDaysBetween(s, e));
-    const spanDays = span * 5; // 5 working days per week column
     
-    let offsetPercent = (offsetDays / spanDays) * 100;
-    let widthPercent = (durationDays / spanDays) * 100;
+    let offsetPercent = (offsetDays / totalSpanWorkingDays) * 100;
+    let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
     if (widthPercent + offsetPercent > 100) widthPercent = 100 - offsetPercent;
 
-    const cells = weeks.map((_, ci) => {
+    const cells = timeline.map((_, ci) => {
       if (ci === startCol) return `<td colspan="${span}" style="padding:0.4rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
         <div style="position:relative; height:26px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
           <div title="${phase.startDate} – ${phase.endDate}" 
-               style="background:${color}; opacity:0.9; border-radius:999px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.68rem; font-weight:600; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 2px 6px ${color}55;">
+               style="background:${color}; opacity:0.9; border-radius:6px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.68rem; font-weight:600; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 2px 6px ${color}55;">
             <span style="overflow:hidden; text-overflow:ellipsis;">${phase.phase}</span>
             <span style="margin-left:0.5rem; opacity:0.85;">${phase.progress || 0}%</span>
           </div>
@@ -637,19 +807,19 @@ function buildPhaseGanttTable(proj, weeks, projColor) {
     }).join('');
 
     return `<tr style="height:44px;">
-      <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 0.75rem; font-size:0.75rem; font-weight:600; color:var(--text-muted); background:rgba(0,0,0,0.15); border-right:2px solid ${color}44; position:sticky; left:0; z-index:2; overflow:visible; white-space:normal; line-height:1.2;">${phase.phase}</td>
+      <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 0.75rem; font-size:0.75rem; font-weight:600; color:var(--text-main); background: color-mix(in srgb, ${color} 10%, #0a0c14); border-right:2px solid ${color}88; position:sticky; left:0; z-index:2; overflow:visible; white-space:normal; line-height:1.2; box-shadow: 6px 0 10px -6px rgba(0,0,0,0.5);">${phase.phase}</td>
       ${cells}</tr>`;
   }).join('');
 
-  const todayX = getTodayX(weeks, LABEL_W, COL_W);
+  const todayX = getTodayX(timeline, LABEL_W, COL_W);
   const todayLine = todayX !== null ? `<div class="today-line" style="left:${todayX}; height: 100%;"></div>` : '';
 
-  const totalW = LABEL_W + totalWeeks * COL_W;
+  const totalW = LABEL_W + totalCols * COL_W;
   return `
     <div style="position:relative; width:100%; min-width:${totalW}px;">
       ${todayLine}
       <table style="border-collapse:collapse; width:100%; table-layout:fixed;">
-        <colgroup><col style="width:${LABEL_W}px;">${weeks.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
+        <colgroup><col style="width:${LABEL_W}px;">${timeline.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
         <thead><tr>
           <th style="position:sticky; left:0; z-index:3; background:rgba(10,12,20,0.98); min-width:${LABEL_W}px; padding:0.5rem 0.75rem; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left;">Fase</th>
           ${headerCells}
@@ -660,6 +830,72 @@ function buildPhaseGanttTable(proj, weeks, projColor) {
 }
 
 
+
+// ─── Workload Heatmap ───────────────────────────────────────────────────────
+function renderWorkloadHeatmap() {
+  const container = document.getElementById('workloadHeatmap');
+  const section = document.getElementById('workloadSection');
+  if (!container || !section) return;
+
+  const activeProjects = appState.projects.filter(p => !p.isArchived && p.client === appState.selectedClient && p.status !== 'Completado' && p.status !== 'Finalizado');
+  
+  if (activeProjects.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+
+  // Count active projects per person
+  const loadMap = {};
+  activeProjects.forEach(proj => {
+    const person = proj.responsible || 'Sin asignar';
+    if (!loadMap[person]) {
+      loadMap[person] = { count: 0, projects: [] };
+    }
+    loadMap[person].count += 1;
+    loadMap[person].projects.push(proj.name);
+  });
+
+  // Sort by load (descending)
+  const sortedLoad = Object.entries(loadMap).sort((a, b) => b[1].count - a[1].count);
+
+  const cardsHtml = sortedLoad.map(([person, data]) => {
+    // Determine color based on workload
+    let color = 'var(--status-done)'; // Green
+    let statusText = 'Carga óptima';
+    if (data.count >= 5) {
+      color = 'var(--status-alert)'; // Red
+      statusText = 'Sobrecarga';
+    } else if (data.count >= 3) {
+      color = 'var(--status-in-progress)'; // Orange/Yellow
+      statusText = 'Carga media';
+    }
+
+    const initials = person.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const tooltipText = data.projects.join('&#10;');
+
+    return `
+      <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem; position: relative; overflow: hidden; transition: transform 0.2s;" title="${tooltipText}">
+        <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: ${color};"></div>
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, ${color} 20%, transparent); border: 1px solid ${color}; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; color: ${color}; flex-shrink: 0;">
+          ${initials}
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${person}">${person}</h4>
+          <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
+            ${statusText}
+          </p>
+        </div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: white;">
+          ${data.count}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = cardsHtml;
+}
 
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 function renderDashboard() {
@@ -714,10 +950,12 @@ function renderProjects() {
     const matchesSearch = p.name.toLowerCase().includes(appState.searchQuery.toLowerCase()) ||
                          p.responsible.toLowerCase().includes(appState.searchQuery.toLowerCase());
     const matchesParticipant = !appState.selectedParticipant || p.responsible === appState.selectedParticipant;
-    return matchesSearch && matchesParticipant;
+    const matchesStatus = appState.selectedStatuses.size === 0 || appState.selectedStatuses.has(p.status);
+    return matchesSearch && matchesParticipant && matchesStatus;
   });
 
   renderParticipantFilters();
+  renderStatusFilters();
 
   const activeProjects = filteredProjects.filter(p => !p.isArchived);
   const archivedProjects = filteredProjects.filter(p => p.isArchived);
@@ -765,7 +1003,10 @@ function renderProjects() {
   }
 
   if (papeleraSection && archivedProjectsListEl) {
-    if (archivedProjects.length > 0) {
+    // Lectores no ven la papelera
+    if (appState.currentUserRole === 'lector') {
+      papeleraSection.style.display = 'none';
+    } else if (archivedProjects.length > 0) {
       papeleraSection.style.display = 'block';
       archivedProjectsListEl.innerHTML = archivedProjects.map((proj, index) => renderProjectCard(proj, index, true)).join('');
     } else {
@@ -780,7 +1021,9 @@ function renderProjectCard(proj, index, isArchived) {
   const projColor = GANTT_COLORS[globalIndex % GANTT_COLORS.length];
   const safeId = proj.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
   const isExpanded = appState.expandedProjects.has(safeId);
-  const canEdit = !!appState.currentUser;
+  const role = appState.currentUserRole;
+  const canEdit = role === 'editor' || role === 'admin';
+  const canDelete = role === 'admin';
 
   return `
   <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s">
@@ -801,7 +1044,7 @@ function renderProjectCard(proj, index, isArchived) {
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-            ${canEdit && !isArchived ? `
+          ${canEdit && !isArchived ? `
               <select class="editable-field" style="background: transparent; border: none; color: inherit; cursor: pointer; padding: 0; outline: none; appearance: none; -webkit-appearance: none; font-family: inherit; font-size: inherit;" onchange="window.handleClientChange('${proj.id}', this.value)">
                 ${appState.clients.map(c => `<option value="${c.name}" ${c.name === proj.client ? 'selected' : ''} style="background: var(--bg-color); color: var(--text-main);">${c.name}</option>`).join('')}
               </select>
@@ -825,7 +1068,7 @@ function renderProjectCard(proj, index, isArchived) {
                           data-project-id="${proj.id}"
                           data-project-name="${proj.name}"
                           title="Restaurar Proyecto">Restaurar</button>
-                  ${appState.currentUserRole === 'admin' ? `
+                  ${canDelete ? `
                   <button class="delete-btn js-delete-permanent" 
                           data-project-id="${proj.id}"
                           data-project-name="${proj.name}"
@@ -847,7 +1090,7 @@ function renderProjectCard(proj, index, isArchived) {
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
         ${proj.phases.map(phase => `
           <div class="phase-card"
-               style="background: rgba(0,0,0,0.2); border-radius: var(--border-radius-sm); padding: 1rem; border: 1px solid transparent; transition: border-color 0.2s, box-shadow 0.2s; cursor: ${canEdit ? 'pointer' : 'default'};"
+               style="background: rgba(0,0,0,0.2); border-radius: var(--border-radius-sm); padding: 1rem; border: 1px solid transparent; transition: border-color 0.2s, box-shadow 0.2s; cursor: ${canEdit ? 'pointer' : 'default'}; display: flex; flex-direction: column; height: 220px;"
                ${canEdit ? `onclick="window.openEditModal('${phase.id}')"` : ''}>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
               <strong style="font-size: 0.9rem;">${phase.phase}</strong>
@@ -857,11 +1100,11 @@ function renderProjectCard(proj, index, isArchived) {
               <span>${phase.startDate} – ${phase.endDate}</span>
               <span style="color: white; font-weight: bold;">${phase.progress || 0}%</span>
             </div>
-            <div class="progress-container" style="height: 4px; margin-top: 0; background: rgba(255,255,255,0.1);">
+            <div class="progress-container" style="height: 4px; margin-top: 0; background: rgba(255,255,255,0.1); flex-shrink: 0;">
               <div class="progress-bar" style="width: ${phase.progress || 0}%; background: ${(phase.progress || 0) === 100 ? 'var(--status-done)' : 'var(--accent-primary)'}"></div>
             </div>
             ${phase.comment ? `
-              <div style="margin-top: 0.75rem; font-size: 0.8rem; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px; border-left: 2px solid var(--accent-secondary); white-space: pre-wrap;">${phase.comment}</div>
+              <div class="phase-comment custom-scrollbar" style="margin-top: 0.75rem; font-size: 0.8rem; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px; border-left: 2px solid var(--accent-secondary); white-space: pre-wrap; flex-grow: 1; overflow-y: auto;">${phase.comment}</div>
             ` : ''}
           </div>
         `).join('')}
@@ -884,7 +1127,7 @@ function renderProjectCard(proj, index, isArchived) {
 
       <!-- Hidden per-project mini Gantt -->
       <div id="gantt-panel-${safeId}" style="display:${isExpanded ? 'block' : 'none'}; overflow-x:auto; margin-top:0; border-top:1px solid var(--card-border); background:rgba(0,0,0,0.15); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg);">
-        ${buildPhaseGanttTable(proj, getWeeksForPhases(proj.phases), projColor)}
+        ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases(proj.phases) : getWeeksForPhases(proj.phases), projColor)}
       </div>
     </div>`;
 }
@@ -947,6 +1190,7 @@ window.toggleStatusFilter = function(status) {
     appState.selectedStatuses.add(status);
   }
   renderGantt();
+  renderProjects(); // Added to filter project list too
   renderStatusFilters();
 };
 
@@ -1415,7 +1659,39 @@ function setupEventListeners() {
       downloadAnchorNode.remove();
     });
   }
+
+  // Settings Modal logic
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const settingsForm = document.getElementById('settingsForm');
+  const geminiApiKeyInput = document.getElementById('geminiApiKey');
+  
+  settingsBtn?.addEventListener('click', () => {
+    if (geminiApiKeyInput) {
+      geminiApiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
+    }
+    settingsModal?.classList.add('active');
+  });
+  
+  const closeSettings = () => {
+    settingsModal?.classList.remove('active');
+  };
+  
+  closeSettingsBtn?.addEventListener('click', closeSettings);
+  settingsModal?.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeSettings();
+  });
+  
+  settingsForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (geminiApiKeyInput) {
+      localStorage.setItem('geminiApiKey', geminiApiKeyInput.value.trim());
+    }
+    closeSettings();
+  });
 }
+
 
 window.openEditModal = function(phaseId) {
   const phase = appState.rawPhases.find(p => p.id === phaseId);
@@ -1541,6 +1817,242 @@ document.head.insertAdjacentHTML("beforeend", `
   </style>
 `);
 
+// ─── User Management Panel ─────────────────────────────────────────────────────────────
+const ROLE_LABELS = { admin: 'Administrador', editor: 'Editor', lector: 'Lector' };
+const ROLE_COLORS = { admin: '#6366f1', editor: '#14b8a6', lector: '#f59e0b' };
+
+function openUserMgmtModal() {
+  if (appState.currentUserRole !== 'admin') return;
+  renderUserList();
+  resetUserForm();
+  document.getElementById('userMgmtModal').classList.add('active');
+}
+
+function closeUserMgmtModal() {
+  document.getElementById('userMgmtModal').classList.remove('active');
+}
+
+function renderUserList() {
+  const container = document.getElementById('userMgmtList');
+  if (!container) return;
+  const users = appState.allUsers;
+  if (users.length === 0) {
+    container.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:1rem;">No hay usuarios registrados aún.</p>`;
+    return;
+  }
+  const roleTag = (role) => `<span style="font-size:0.7rem;padding:0.15rem 0.6rem;border-radius:999px;background:${ROLE_COLORS[role] || '#555'}22;color:${ROLE_COLORS[role] || '#aaa'};border:1px solid ${ROLE_COLORS[role] || '#555'}44;font-weight:600;">${ROLE_LABELS[role] || role}</span>`;
+  container.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      ${users.map(u => `
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:rgba(0,0,0,0.15);border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;color:white;flex-shrink:0;">${(u.displayName || u.email || '?')[0].toUpperCase()}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:0.9rem;">${u.displayName || '(sin nombre)'}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email}</div>
+            ${u.role === 'lector' && u.allowedClients?.length ? `<div style="font-size:0.72rem;color:#f59e0b;margin-top:0.15rem;">Clientes: ${u.allowedClients.join(', ')}</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            ${roleTag(u.role)}
+            <button onclick="window.editUserForm('${u.uid}')" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:0.25rem 0.6rem;font-size:0.75rem;border-radius:6px;">Editar</button>
+            ${u.uid !== appState.currentUser?.uid ? `<button onclick="window.confirmDeleteUser('${u.uid}','${(u.email||'').replace(/'/g,"\'")}')" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:0.25rem 0.6rem;font-size:0.75rem;border-radius:6px;">Eliminar</button>` : '<span style="font-size:0.7rem;color:var(--text-muted);">(tú)</span>'}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.onUserRoleChange = function() {
+  const role = document.getElementById('userRole').value;
+  const section = document.getElementById('allowedClientsSection');
+  if (section) section.style.display = role === 'lector' ? 'block' : 'none';
+};
+
+function renderAllowedClientsCheckboxes(selected = []) {
+  const container = document.getElementById('allowedClientsList');
+  if (!container) return;
+  container.innerHTML = appState.clients.map(c => `
+    <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;padding:0.3rem 0.5rem;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+      <input type="checkbox" name="allowedClient" value="${c.name}" ${selected.includes(c.name) ? 'checked' : ''} style="accent-color:#6366f1;" />
+      ${c.name}
+    </label>
+  `).join('');
+}
+
+function resetUserForm() {
+  document.getElementById('editingUserId').value = '';
+  document.getElementById('userUid').value = '';
+  document.getElementById('userUid').disabled = false;
+  document.getElementById('userEmail2').value = '';
+  document.getElementById('userDisplayName').value = '';
+  document.getElementById('userRole').value = 'editor';
+  document.getElementById('allowedClientsSection').style.display = 'none';
+  document.getElementById('userFormTitle').textContent = 'Agregar usuario';
+  const errEl = document.getElementById('userMgmtError');
+  if (errEl) errEl.style.display = 'none';
+  renderAllowedClientsCheckboxes([]);
+}
+
+window.editUserForm = function(uid) {
+  const u = appState.allUsers.find(x => x.uid === uid);
+  if (!u) return;
+  document.getElementById('editingUserId').value = uid;
+  document.getElementById('userUid').value = u.uid;
+  document.getElementById('userUid').disabled = true;
+  document.getElementById('userEmail2').value = u.email || '';
+  document.getElementById('userDisplayName').value = u.displayName || '';
+  document.getElementById('userRole').value = u.role || 'editor';
+  const section = document.getElementById('allowedClientsSection');
+  if (section) section.style.display = u.role === 'lector' ? 'block' : 'none';
+  renderAllowedClientsCheckboxes(u.allowedClients || []);
+  document.getElementById('userFormTitle').textContent = 'Editar usuario';
+};
+
+async function saveUser() {
+  const errEl = document.getElementById('userMgmtError');
+  if (errEl) errEl.style.display = 'none';
+
+  const uid         = document.getElementById('userUid').value.trim();
+  const email       = document.getElementById('userEmail2').value.trim();
+  const displayName = document.getElementById('userDisplayName').value.trim();
+  const role        = document.getElementById('userRole').value;
+  const allowedClients = role === 'lector'
+    ? Array.from(document.querySelectorAll('input[name="allowedClient"]:checked')).map(cb => cb.value)
+    : [];
+
+  if (!uid) {
+    if (errEl) { errEl.textContent = 'El UID es obligatorio.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!email) {
+    if (errEl) { errEl.textContent = 'El correo es obligatorio.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (role === 'lector' && allowedClients.length === 0) {
+    if (errEl) { errEl.textContent = 'Debes seleccionar al menos un cliente para el rol Lector.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const btn = document.getElementById('saveUserBtn');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  try {
+    await saveUserProfile(db, uid, { email, displayName, role, allowedClients });
+    renderUserList();
+    resetUserForm();
+  } catch (err) {
+    console.error('Error saving user:', err);
+    if (errEl) { errEl.textContent = 'Error al guardar: ' + err.message; errEl.style.display = 'block'; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar Usuario';
+  }
+}
+
+window.confirmDeleteUser = function(uid, email) {
+  showConfirmModal(
+    'Eliminar Usuario',
+    `¿Eliminar el perfil de "${email}"? Esto revoca su acceso al sistema. No elimina su cuenta de Firebase Auth.`,
+    async () => {
+      try {
+        await deleteUserProfile(db, uid);
+        renderUserList();
+      } catch (err) {
+        alert('Error al eliminar: ' + err.message);
+      }
+    }
+  );
+};
+
+// ─── AI Tooltip Logic ───────────────────────────────────────────────────────
+let hoverTimer = null;
+const aiCache = new Map(); // Cache generated summaries
+
+window.handleGanttHover = function(e, projectId) {
+  const td = e.currentTarget;
+  const span = td.querySelector('span');
+  if (span) {
+    span.style.color = '#3b82f6';
+    span.style.transform = 'translateX(6px)';
+  }
+
+  const tooltip = document.getElementById('aiTooltip');
+  const tooltipContent = document.getElementById('aiTooltipContent');
+  if (!tooltip || !tooltipContent) return;
+  
+  // Position the tooltip near the mouse
+  const x = e.clientX + 15;
+  const y = e.clientY + 15;
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+
+  // Start a timeout to fetch AI summary (delay 600ms)
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(async () => {
+    const proj = appState.projects.find(p => p.id === projectId || p.name.replace(/[^a-z0-9]/gi, '-').toLowerCase() === projectId);
+    if (!proj) return;
+    
+    tooltip.style.display = 'block';
+    // Small delay for fade in
+    setTimeout(() => tooltip.style.opacity = '1', 10);
+    
+    if (aiCache.has(proj.name)) {
+      tooltipContent.innerHTML = aiCache.get(proj.name);
+      return;
+    }
+    
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      tooltipContent.innerHTML = `No se ha configurado una API Key de Gemini. <a href="#" onclick="document.getElementById('settingsModal').classList.add('active'); return false;" style="color:var(--accent-primary);">Configurar aquí</a>.`;
+      return;
+    }
+    
+    tooltipContent.innerHTML = `Analizando <b>${proj.phases.length}</b> fases del proyecto... <div class="spinner" style="margin-top:0.5rem;width:16px;height:16px;"></div>`;
+    
+    // Build context for AI
+    const comments = proj.phases.filter(p => p.comment && p.comment.trim() !== '').map(p => `${p.phase}: ${p.comment}`);
+    let promptContext = `El proyecto "${proj.name}" está en estado "${proj.status}" con un progreso general del ${proj.overallProgress}%.`;
+    if (comments.length > 0) {
+      promptContext += ` Aquí están los comentarios de las fases:\n${comments.join('\n')}`;
+    } else {
+      promptContext += ` No hay comentarios en las fases.`;
+    }
+    
+    const prompt = `Eres un asistente de Project Management. A continuación te doy datos del proyecto: ${promptContext}. Escribe un resumen ejecutivo y conciso (máximo 40 palabras) de la salud del proyecto. Si hay comentarios, destaca riesgos o puntos importantes en viñetas cortas. Mantén un tono profesional y utiliza formato markdown simple.`;
+    
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      // Format markdown to HTML briefly (replace ** with <b>, \n with <br>)
+      const htmlText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+      aiCache.set(proj.name, htmlText);
+      tooltipContent.innerHTML = htmlText;
+    } catch (error) {
+      console.error(error);
+      tooltipContent.innerHTML = `<span style="color:#f87171;">Error al generar el resumen. Verifica tu API Key o la conexión.</span>`;
+    }
+  }, 600);
+};
+
+window.handleGanttLeave = function(e) {
+  const td = e.currentTarget;
+  const span = td.querySelector('span');
+  if (span) {
+    span.style.color = 'var(--text-main)';
+    span.style.transform = '';
+  }
+  
+  clearTimeout(hoverTimer);
+  const tooltip = document.getElementById('aiTooltip');
+  if (tooltip) {
+    tooltip.style.opacity = '0';
+    setTimeout(() => {
+      if (tooltip.style.opacity === '0') tooltip.style.display = 'none';
+    }, 200);
+  }
+};
 
 // Start
 init();
