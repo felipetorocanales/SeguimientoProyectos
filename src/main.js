@@ -21,7 +21,10 @@ import {
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -37,6 +40,9 @@ let appState = {
   frozenActiveIds: null,
   frozenArchivedIds: null,
   unsubscribe: null,
+  unsubscribeClients: null,
+  unsubscribeUsers: null,
+  unsubscribeLogs: null,
   selectedClient: null,
   clients: [],
   allUsers: [],
@@ -125,10 +131,25 @@ function showLoading() {
   `;
 }
 
+function cleanupSubscriptions() {
+  if (appState.unsubscribe) appState.unsubscribe();
+  if (appState.unsubscribeClients) appState.unsubscribeClients();
+  if (appState.unsubscribeUsers) appState.unsubscribeUsers();
+  if (appState.unsubscribeLogs) appState.unsubscribeLogs();
+  
+  appState.unsubscribe = null;
+  appState.unsubscribeClients = null;
+  appState.unsubscribeUsers = null;
+  appState.unsubscribeLogs = null;
+}
+
 // Initialize Application
 async function init() {
   setupLoginScreen();
   showLoading();
+
+  setupEventListeners();
+  setupAuthListeners();
 
   // Watch auth state
   onAuthStateChanged(auth, async (user) => {
@@ -136,51 +157,58 @@ async function init() {
     if (user) {
       appState.currentUserRole = await getUserRole(db, user.uid);
       appState.currentUserProfile = await getUserProfile(db, user.uid);
+      
+      cleanupSubscriptions();
+
+      // Subscribe to real-time updates: PHASES
+      appState.unsubscribe = subscribeToPhases(db, (phases) => {
+        appState.rawPhases = phases;
+        appState.projects = aggregateProjectData(phases);
+        render();
+      });
+
+      // Subscribe to real-time updates: CLIENTS
+      appState.unsubscribeClients = subscribeToClients(db, (clients) => {
+        appState.clients = clients;
+        if (!appState.selectedClient && clients.length > 0) {
+          const savedClient = localStorage.getItem('selectedClient');
+          const restoredClient = savedClient && clients.find(c => c.name === savedClient);
+          if (restoredClient) {
+            appState.selectedClient = restoredClient.name;
+          } else {
+            const mutual = clients.find(c => c.name === 'Mutual');
+            appState.selectedClient = mutual ? mutual.name : clients[0].name;
+          }
+        }
+        render();
+      });
+
+      // Subscribe to users (for admin panel)
+      appState.unsubscribeUsers = subscribeToUsers(db, (users) => {
+        appState.allUsers = users;
+      });
+
+      // Subscribe to real-time updates: LOGS
+      appState.unsubscribeLogs = subscribeToLogs(db, (logs) => {
+        appState.logs = logs;
+        if (appState.currentView === 'logs') renderLogs();
+      });
+
     } else {
       appState.currentUserRole = null;
       appState.currentUserProfile = null;
+      cleanupSubscriptions();
+      appState.rawPhases = [];
+      appState.projects = [];
+      appState.clients = [];
+      appState.allUsers = [];
+      appState.logs = [];
     }
+    
     applyAuthUI(user);
     applyRoleRestrictions();
     render();
     setupScrollEffects();
-  });
-
-  // Subscribe to real-time updates: PHASES
-  appState.unsubscribe = subscribeToPhases(db, (phases) => {
-    appState.rawPhases = phases;
-    appState.projects = aggregateProjectData(phases);
-    render();
-  });
-
-  // Subscribe to real-time updates: CLIENTS
-  subscribeToClients(db, (clients) => {
-    appState.clients = clients;
-    if (!appState.selectedClient && clients.length > 0) {
-      const savedClient = localStorage.getItem('selectedClient');
-      const restoredClient = savedClient && clients.find(c => c.name === savedClient);
-      if (restoredClient) {
-        appState.selectedClient = restoredClient.name;
-      } else {
-        const mutual = clients.find(c => c.name === 'Mutual');
-        appState.selectedClient = mutual ? mutual.name : clients[0].name;
-      }
-    }
-    render();
-  });
-
-  // Subscribe to users (for admin panel)
-  subscribeToUsers(db, (users) => {
-    appState.allUsers = users;
-  });
-
-  setupEventListeners();
-  setupAuthListeners();
-
-  // Subscribe to real-time updates: LOGS
-  subscribeToLogs(db, (logs) => {
-    appState.logs = logs;
-    if (appState.currentView === 'logs') renderLogs();
   });
 
   if (window.location.hash === '#logs') window.showLogsView();
@@ -306,7 +334,6 @@ function setupLoginScreen() {
   });
 }
 
-// ─── Auth Listeners ─────────────────────────────────────────────────────────
 function setupAuthListeners() {
   // Logout
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
@@ -339,6 +366,107 @@ function setupAuthListeners() {
       }
     }
   });
+
+  // Settings Modal
+  document.getElementById('settingsBtn')?.addEventListener('click', () => {
+    openSettingsModal();
+  });
+  document.getElementById('closeSettingsBtn')?.addEventListener('click', closeSettingsModal);
+  document.getElementById('settingsModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('settingsModal')) closeSettingsModal();
+  });
+
+  document.getElementById('settingsForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const key = document.getElementById('geminiApiKey').value.trim();
+    localStorage.setItem('gemini_api_key', key);
+    alert('Configuración guardada correctamente.');
+    closeSettingsModal();
+  });
+
+  document.getElementById('changePasswordForm')?.addEventListener('submit', handlePasswordChange);
+}
+
+function openSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  const apiKeyInput = document.getElementById('geminiApiKey');
+  const pwdForm = document.getElementById('changePasswordForm');
+  
+  if (apiKeyInput) apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+  if (pwdForm) pwdForm.reset();
+  
+  const err = document.getElementById('passwordError');
+  const success = document.getElementById('passwordSuccess');
+  if (err) err.style.display = 'none';
+  if (success) success.style.display = 'none';
+  
+  if (modal) modal.classList.add('active');
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handlePasswordChange(e) {
+  e.preventDefault();
+  const currentPwd = document.getElementById('currentPassword').value;
+  const newPwd = document.getElementById('newPassword').value;
+  const confirmPwd = document.getElementById('confirmNewPassword').value;
+  const errEl = document.getElementById('passwordError');
+  const successEl = document.getElementById('passwordSuccess');
+  const submitBtn = document.getElementById('changePasswordBtn');
+
+  if (errEl) errEl.style.display = 'none';
+  if (successEl) successEl.style.display = 'none';
+
+  if (newPwd !== confirmPwd) {
+    if (errEl) { errEl.textContent = 'Las contraseñas no coinciden.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  if (newPwd.length < 6) {
+    if (errEl) { errEl.textContent = 'La nueva contraseña debe tener al menos 6 caracteres.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Procesando...';
+
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No hay una sesión activa.');
+
+    // Re-authenticate user
+    const credential = EmailAuthProvider.credential(user.email, currentPwd);
+    await reauthenticateWithCredential(user, credential);
+
+    // Update password
+    await updatePassword(user, newPwd);
+
+    if (successEl) { 
+      successEl.textContent = '¡Contraseña actualizada! Se ha cerrado la sesión en otros dispositivos.'; 
+      successEl.style.display = 'block'; 
+    }
+    e.target.reset();
+    
+    // Optional: alert and close
+    setTimeout(() => {
+      closeSettingsModal();
+    }, 2000);
+
+  } catch (err) {
+    console.error("Error changing password:", err);
+    let msg = 'Error al cambiar la contraseña.';
+    if (err.code === 'auth/wrong-password') msg = 'La contraseña actual es incorrecta.';
+    else if (err.code === 'auth/weak-password') msg = 'La contraseña es muy débil.';
+    else if (err.code === 'auth/requires-recent-login') msg = 'Por seguridad, vuelve a iniciar sesión antes de realizar este cambio.';
+    
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Actualizar y Cerrar Otros Dispositivos';
+  }
 }
 
 // Render the UI

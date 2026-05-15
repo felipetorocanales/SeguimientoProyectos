@@ -566,7 +566,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal (API Key) -->
+  <!-- Settings Modal (API Key & Password) -->
   <div id="settingsModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 420px;">
       <div class="modal-header">
@@ -576,7 +576,7 @@
           </div>
           <div>
             <h3 style="font-size:1.1rem; margin:0;">Configuración</h3>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Ajustes del sistema</p>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Ajustes del sistema y seguridad</p>
           </div>
         </div>
         <button id="closeSettingsBtn" class="close-btn">&times;</button>
@@ -586,12 +586,41 @@
           <div class="form-group">
             <label class="form-label" for="geminiApiKey">API Key de Gemini (Google AI)</label>
             <input type="password" id="geminiApiKey" class="form-input" placeholder="AIzaSy..." />
-            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Requerida para los análisis automáticos de proyectos. Se almacena localmente en tu navegador.</p>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Requerida para los análisis automáticos de proyectos.</p>
           </div>
-          <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-            <button type="submit" class="primary" style="padding: 0.6rem 1.5rem;">Guardar</button>
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 2rem;">
+            <button type="submit" class="primary" style="padding: 0.6rem 1.5rem;">Guardar API Key</button>
           </div>
         </form>
+
+        <div style="border-top: 1px solid var(--card-border); padding-top: 1.5rem; margin-top: 1.5rem;">
+          <h4 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-color); display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            Cambiar Contraseña
+          </h4>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Al cambiar tu contraseña, se cerrará la sesión en todos los demás dispositivos por seguridad.
+          </p>
+          <form id="changePasswordForm">
+            <div class="form-group">
+              <label class="form-label">Contraseña Actual</label>
+              <input type="password" id="currentPassword" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nueva Contraseña</label>
+              <input type="password" id="newPassword" class="form-input" required minlength="6" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirmar Nueva Contraseña</label>
+              <input type="password" id="confirmNewPassword" class="form-input" required />
+            </div>
+            <p id="passwordError" style="display:none; color:#f87171; font-size:0.75rem; margin-bottom:1rem;"></p>
+            <p id="passwordSuccess" style="display:none; color:#10b981; font-size:0.75rem; margin-bottom:1rem;"></p>
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" id="changePasswordBtn" class="primary" style="padding: 0.6rem 1.5rem; background: var(--status-alert);">Actualizar y Cerrar Otros Dispositivos</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
