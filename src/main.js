@@ -229,8 +229,8 @@ async function init() {
 
   window.addEventListener('hashchange', () => {
     if (window.location.hash === '#executive') {
-      // Only gerente can access the executive view
-      if (appState.currentUserRole === 'gerente') {
+      // Only gerente and admin can access the executive view
+      if (appState.currentUserRole === 'gerente' || appState.currentUserRole === 'admin') {
         window.switchAppView('executive');
       } else {
         window.location.hash = '';
@@ -275,9 +275,9 @@ function applyAuthUI(user) {
     if (showLogsBtn) showLogsBtn.style.display = (role === 'editor' || role === 'admin') ? 'flex' : 'none';
     // Manage users: admin only
     if (manageUsersBtn) manageUsersBtn.style.display = role === 'admin' ? 'flex' : 'none';
-    // View mode selector: only gerente can switch to executive view
+    // View mode selector: only gerente and admin can switch to executive view
     const viewModeSelector = document.getElementById('viewModeSelector');
-    if (viewModeSelector) viewModeSelector.style.display = role === 'gerente' ? 'inline-flex' : 'none';
+    if (viewModeSelector) viewModeSelector.style.display = (role === 'gerente' || role === 'admin') ? 'inline-flex' : 'none';
   } else {
     // Show full-page login screen
     if (loginScreen) { loginScreen.style.display = 'flex'; loginScreen.style.opacity = '1'; }
@@ -1923,8 +1923,8 @@ function closeModal() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 window.switchAppView = function(view) {
-  // Only gerente role can access the executive view
-  if (view === 'executive' && appState.currentUserRole !== 'gerente') {
+  // Only gerente and admin roles can access the executive view
+  if (view === 'executive' && appState.currentUserRole !== 'gerente' && appState.currentUserRole !== 'admin') {
     view = 'main';
   }
 
@@ -1936,7 +1936,7 @@ window.switchAppView = function(view) {
   const viewMainBtn = document.getElementById('viewMainBtn');
   const viewExecBtn = document.getElementById('viewExecBtn');
   const viewModeSelector = document.getElementById('viewModeSelector');
-  const isGerente = appState.currentUserRole === 'gerente';
+  const isGerente = appState.currentUserRole === 'gerente' || appState.currentUserRole === 'admin';
 
   if (view === 'executive') {
     if (mainSection) mainSection.style.display = 'none';
@@ -1960,7 +1960,7 @@ window.switchAppView = function(view) {
     if (logsSection) logsSection.style.display = 'none';
     if (viewMainBtn) viewMainBtn.classList.add('active');
     if (viewExecBtn) viewExecBtn.classList.remove('active');
-    // Only show the view switcher to gerente users
+    // Only show the view switcher to gerente and admin users
     if (viewModeSelector) viewModeSelector.style.display = isGerente ? 'inline-flex' : 'none';
     if (window.location.hash === '#logs' || window.location.hash === '#executive') window.location.hash = '';
     render();
