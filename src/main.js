@@ -229,7 +229,13 @@ async function init() {
 
   window.addEventListener('hashchange', () => {
     if (window.location.hash === '#executive') {
-      window.switchAppView('executive');
+      // Only gerente can access the executive view
+      if (appState.currentUserRole === 'gerente') {
+        window.switchAppView('executive');
+      } else {
+        window.location.hash = '';
+        window.switchAppView('main');
+      }
     } else if (window.location.hash === '#logs') {
       window.switchAppView('logs');
     } else {
@@ -269,6 +275,9 @@ function applyAuthUI(user) {
     if (showLogsBtn) showLogsBtn.style.display = (role === 'editor' || role === 'admin') ? 'flex' : 'none';
     // Manage users: admin only
     if (manageUsersBtn) manageUsersBtn.style.display = role === 'admin' ? 'flex' : 'none';
+    // View mode selector: only gerente can switch to executive view
+    const viewModeSelector = document.getElementById('viewModeSelector');
+    if (viewModeSelector) viewModeSelector.style.display = role === 'gerente' ? 'inline-flex' : 'none';
   } else {
     // Show full-page login screen
     if (loginScreen) { loginScreen.style.display = 'flex'; loginScreen.style.opacity = '1'; }
@@ -1914,6 +1923,11 @@ function closeModal() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 window.switchAppView = function(view) {
+  // Only gerente role can access the executive view
+  if (view === 'executive' && appState.currentUserRole !== 'gerente') {
+    view = 'main';
+  }
+
   appState.currentView = view;
   
   const mainSection = document.getElementById('mainSection');
@@ -1922,6 +1936,7 @@ window.switchAppView = function(view) {
   const viewMainBtn = document.getElementById('viewMainBtn');
   const viewExecBtn = document.getElementById('viewExecBtn');
   const viewModeSelector = document.getElementById('viewModeSelector');
+  const isGerente = appState.currentUserRole === 'gerente';
 
   if (view === 'executive') {
     if (mainSection) mainSection.style.display = 'none';
@@ -1945,7 +1960,8 @@ window.switchAppView = function(view) {
     if (logsSection) logsSection.style.display = 'none';
     if (viewMainBtn) viewMainBtn.classList.add('active');
     if (viewExecBtn) viewExecBtn.classList.remove('active');
-    if (viewModeSelector) viewModeSelector.style.display = 'inline-flex';
+    // Only show the view switcher to gerente users
+    if (viewModeSelector) viewModeSelector.style.display = isGerente ? 'inline-flex' : 'none';
     if (window.location.hash === '#logs' || window.location.hash === '#executive') window.location.hash = '';
     render();
   }
