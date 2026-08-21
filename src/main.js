@@ -34,7 +34,7 @@ let appState = {
   projects: [],
   searchQuery: '',
   selectedParticipant: null,
-  selectedStatuses: new Set(),
+  selectedStatuses: new Set(['En curso']),
   sortOrder: 'name_asc',
   needsResort: true,
   frozenActiveIds: null,
@@ -50,10 +50,14 @@ let appState = {
   fpEnd: null,
   expandedProjects: new Set(),
   currentUser: null,
-  currentUserRole: null,   // 'lector' | 'editor' | 'admin'
+  currentUserRole: null,   // 'lector' | 'editor' | 'admin' | 'gerente'
   currentUserProfile: null, // full profile from Firestore
   logs: [],
   currentView: 'main',
+  execSelectedClient: 'all',
+  execHealthFilter: 'all',
+  execSearchQuery: '',
+  lastAiBriefingText: '',
   initialGanttScrollDone: false,
   returnScrollPos: null,
   ganttViewMode: 'weeks', // 'weeks' | 'months'
@@ -150,6 +154,7 @@ async function init() {
 
   setupEventListeners();
   setupAuthListeners();
+  setupExecutiveEventListeners();
 
   // Watch auth state
   onAuthStateChanged(auth, async (user) => {
@@ -194,6 +199,17 @@ async function init() {
         if (appState.currentView === 'logs') renderLogs();
       });
 
+      // Role based view navigation: Gerentes / Jefaturas default to executive view
+      if (appState.currentUserRole === 'gerente') {
+        window.switchAppView('executive');
+      } else if (window.location.hash === '#executive') {
+        window.switchAppView('executive');
+      } else if (window.location.hash === '#logs') {
+        window.switchAppView('logs');
+      } else {
+        window.switchAppView('main');
+      }
+
     } else {
       appState.currentUserRole = null;
       appState.currentUserProfile = null;
@@ -211,7 +227,15 @@ async function init() {
     setupScrollEffects();
   });
 
-  if (window.location.hash === '#logs') window.showLogsView();
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash === '#executive') {
+      window.switchAppView('executive');
+    } else if (window.location.hash === '#logs') {
+      window.switchAppView('logs');
+    } else {
+      window.switchAppView('main');
+    }
+  });
 }
 
 // ─── Auth UI ────────────────────────────────────────────────────────────────
@@ -471,6 +495,14 @@ async function handlePasswordChange(e) {
 
 // Render the UI
 function render() {
+  if (appState.currentView === 'executive') {
+    renderExecutiveView();
+    return;
+  }
+  if (appState.currentView === 'logs') {
+    renderLogs();
+    return;
+  }
   renderClientTabs();
   renderGantt();
   renderStatusFilters();
@@ -1877,30 +1909,591 @@ function closeModal() {
   modalOverlay.classList.remove('active');
 }
 
-window.showLogsView = function() {
-  appState.currentView = 'logs';
-  window.location.hash = 'logs';
+// ═════════════════════════════════════════════════════════════════════════════
+// EXECUTIVE SUMMARY MODULE (VISTA DIRECTIVA / GERENCIA)
+// ═════════════════════════════════════════════════════════════════════════════
+
+window.switchAppView = function(view) {
+  appState.currentView = view;
   
-  const mainMain = document.querySelector('main:not(#logsSection)');
+  const mainSection = document.getElementById('mainSection');
+  const execSection = document.getElementById('executiveSection');
   const logsSection = document.getElementById('logsSection');
-  
-  if (mainMain) mainMain.style.display = 'none';
-  if (logsSection) logsSection.style.display = 'flex';
-  
-  renderLogs();
+  const viewMainBtn = document.getElementById('viewMainBtn');
+  const viewExecBtn = document.getElementById('viewExecBtn');
+  const viewModeSelector = document.getElementById('viewModeSelector');
+
+  if (view === 'executive') {
+    if (mainSection) mainSection.style.display = 'none';
+    if (execSection) execSection.style.display = 'flex';
+    if (logsSection) logsSection.style.display = 'none';
+    if (viewExecBtn) viewExecBtn.classList.add('active');
+    if (viewMainBtn) viewMainBtn.classList.remove('active');
+    if (viewModeSelector) viewModeSelector.style.display = 'inline-flex';
+    if (window.location.hash !== '#executive') window.location.hash = 'executive';
+    renderExecutiveView();
+  } else if (view === 'logs') {
+    if (mainSection) mainSection.style.display = 'none';
+    if (execSection) execSection.style.display = 'none';
+    if (logsSection) logsSection.style.display = 'flex';
+    if (viewModeSelector) viewModeSelector.style.display = 'none';
+    if (window.location.hash !== '#logs') window.location.hash = 'logs';
+    renderLogs();
+  } else {
+    if (mainSection) mainSection.style.display = 'flex';
+    if (execSection) execSection.style.display = 'none';
+    if (logsSection) logsSection.style.display = 'none';
+    if (viewMainBtn) viewMainBtn.classList.add('active');
+    if (viewExecBtn) viewExecBtn.classList.remove('active');
+    if (viewModeSelector) viewModeSelector.style.display = 'inline-flex';
+    if (window.location.hash === '#logs' || window.location.hash === '#executive') window.location.hash = '';
+    render();
+  }
+};
+
+window.showLogsView = function() {
+  window.switchAppView('logs');
 };
 
 window.showMainView = function() {
-  appState.currentView = 'main';
-  window.location.hash = '';
-  
-  const mainMain = document.querySelector('main:not(#logsSection)');
-  const logsSection = document.getElementById('logsSection');
-  
-  if (mainMain) mainMain.style.display = 'flex';
-  if (logsSection) logsSection.style.display = 'none';
-  
-  render();
+  window.switchAppView('main');
+};
+
+function setupExecutiveEventListeners() {
+  const clientFilter = document.getElementById('execClientFilter');
+  if (clientFilter) {
+    clientFilter.addEventListener('change', (e) => {
+      appState.execSelectedClient = e.target.value;
+      renderExecutiveView();
+    });
+  }
+
+  const searchInput = document.getElementById('execSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      appState.execSearchQuery = e.target.value.toLowerCase().trim();
+      const filtered = getExecutiveProjects();
+      renderExecutiveProjectsTable(filtered);
+    });
+  }
+
+  const closeAiModalBtn = document.getElementById('closeExecutiveAiModalBtn');
+  const aiModal = document.getElementById('executiveAiModal');
+  if (closeAiModalBtn && aiModal) {
+    closeAiModalBtn.addEventListener('click', () => aiModal.classList.remove('active'));
+    aiModal.addEventListener('click', (e) => {
+      if (e.target === aiModal) aiModal.classList.remove('active');
+    });
+  }
+}
+
+function getExecutiveProjects() {
+  let list = appState.projects.filter(p => !p.isArchived);
+
+  // Lector role client security restrictions
+  if (appState.currentUserRole === 'lector') {
+    const allowed = appState.currentUserProfile?.allowedClients || [];
+    list = list.filter(p => allowed.includes(p.client));
+  }
+
+  // Filter by selected executive client
+  if (appState.execSelectedClient && appState.execSelectedClient !== 'all') {
+    list = list.filter(p => p.client === appState.execSelectedClient);
+  }
+
+  return list;
+}
+
+function renderExecutiveView() {
+  const execSection = document.getElementById('executiveSection');
+  if (!execSection || execSection.style.display === 'none') return;
+
+  // Render Date Badge
+  const dateBadge = document.getElementById('execCurrentDateBadge');
+  if (dateBadge) {
+    const now = new Date();
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    dateBadge.textContent = `📅 ${now.toLocaleDateString('es-CL', options)}`;
+  }
+
+  // Populate Client Filter dropdown
+  const clientFilter = document.getElementById('execClientFilter');
+  if (clientFilter) {
+    let clients = appState.clients;
+    if (appState.currentUserRole === 'lector') {
+      const allowed = appState.currentUserProfile?.allowedClients || [];
+      clients = clients.filter(c => allowed.includes(c.name));
+    }
+
+    const currentVal = appState.execSelectedClient || 'all';
+    clientFilter.innerHTML = `
+      <option value="all" ${currentVal === 'all' ? 'selected' : ''}>🌐 Portafolio Global (Todos)</option>
+      ${clients.map(c => `
+        <option value="${c.name}" ${currentVal === c.name ? 'selected' : ''}>📁 ${c.name}</option>
+      `).join('')}
+    `;
+  }
+
+  const projects = getExecutiveProjects();
+
+  renderExecutiveKPIs(projects);
+  renderExecutiveRisks(projects);
+  renderExecutiveDeliveries(projects);
+  renderExecutiveHealthFilters();
+  renderExecutiveProjectsTable(projects);
+}
+
+function renderExecutiveKPIs(projects) {
+  const container = document.getElementById('execKpisContainer');
+  if (!container) return;
+
+  const total = projects.length;
+  const onTrack = projects.filter(p => p.health === 'on_track').length;
+  const atRisk = projects.filter(p => p.health === 'at_risk').length;
+  const delayed = projects.filter(p => p.health === 'delayed').length;
+  const completed = projects.filter(p => p.health === 'completed').length;
+
+  const activeProjects = projects.filter(p => p.status !== 'Completado');
+  const avgProgress = activeProjects.length > 0
+    ? Math.round(activeProjects.reduce((sum, p) => sum + (p.overallProgress || 0), 0) / activeProjects.length)
+    : (total > 0 ? 100 : 0);
+
+  // Deliveries in next 30 days
+  const upcomingDeliveries = activeProjects.filter(p => p.daysRemaining !== null && p.daysRemaining >= 0 && p.daysRemaining <= 30);
+
+  // Active phases distribution
+  const phaseCounts = { 'Levantamiento': 0, 'Desarrollo': 0, 'Testing/QA': 0, 'Entrega': 0 };
+  activeProjects.forEach(p => {
+    if (phaseCounts[p.currentPhase] !== undefined) {
+      phaseCounts[p.currentPhase]++;
+    }
+  });
+
+  container.innerHTML = `
+    <!-- KPI 1: Salud General -->
+    <div class="exec-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Salud de Cartera</span>
+        <span class="exec-pill exec-pill-purple">${total} proyectos</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.75rem;">
+        <div style="background: var(--exec-soft-green-bg); border: 1px solid var(--exec-soft-green-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-green);">${onTrack}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">A Tiempo</div>
+        </div>
+        <div style="background: var(--exec-soft-amber-bg); border: 1px solid var(--exec-soft-amber-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-amber);">${atRisk}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">En Riesgo</div>
+        </div>
+        <div style="background: var(--exec-soft-coral-bg); border: 1px solid var(--exec-soft-coral-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-coral);">${delayed}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">Retrasados</div>
+        </div>
+        <div style="background: var(--exec-soft-blue-bg); border: 1px solid var(--exec-soft-blue-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-blue);">${completed}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">Completados</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI 2: Avance Ponderado -->
+    <div class="exec-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Avance Promedio</span>
+        <span class="exec-pill exec-pill-green">${activeProjects.length} en curso</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0;">
+        <span style="font-size: 2.2rem; font-weight: 800; color: var(--text-main); line-height: 1;">${avgProgress}%</span>
+        <span style="font-size: 0.85rem; color: var(--exec-soft-green); font-weight: 600;">Progreso global</span>
+      </div>
+      <div class="exec-progress-wrap" style="height: 8px; margin: 0.75rem 0 0.5rem;">
+        <div class="exec-progress-fill" style="width: ${avgProgress}%; background: linear-gradient(90deg, #6366f1, #6ee7b7);"></div>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">Calculado sobre todas las fases de proyectos activos.</p>
+    </div>
+
+    <!-- KPI 3: Próximas Entregas -->
+    <div class="exec-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Hitos del Mes</span>
+        <span class="exec-pill exec-pill-blue">Próximos 30 días</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0;">
+        <span style="font-size: 2.2rem; font-weight: 800; color: var(--exec-soft-blue); line-height: 1;">${upcomingDeliveries.length}</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Entregas críticas</span>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+        ${upcomingDeliveries.length > 0 
+          ? `Próxima entrega: <strong style="color:#e0e7ff;">${upcomingDeliveries[0].name}</strong> (${upcomingDeliveries[0].deliveryDate || 'Pronto'})`
+          : 'No hay cierres programados para las próximas 4 semanas.'}
+      </div>
+    </div>
+
+    <!-- KPI 4: Distribución por Fases -->
+    <div class="exec-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Fase Activa Actual</span>
+        <span class="exec-pill exec-pill-purple">Distribución</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem;">
+        ${Object.entries(phaseCounts).map(([phaseName, count]) => `
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem;">
+            <span style="color: var(--text-muted);">${phaseName}</span>
+            <span style="font-weight: 700; color: var(--text-main);">${count}</span>
+          </div>
+          <div class="exec-progress-wrap" style="height: 4px; margin-bottom: 0.2rem;">
+            <div class="exec-progress-fill" style="width: ${activeProjects.length > 0 ? (count / activeProjects.length) * 100 : 0}%; background: ${PHASE_COLORS[phaseName] || '#6366f1'};"></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderExecutiveRisks(projects) {
+  const container = document.getElementById('execRisksList');
+  const countBadge = document.getElementById('execRisksCountBadge');
+  if (!container) return;
+
+  const atRiskList = projects.filter(p => p.health === 'delayed' || p.health === 'at_risk');
+
+  if (countBadge) {
+    countBadge.textContent = `${atRiskList.length} ${atRiskList.length === 1 ? 'alerta' : 'alertas'}`;
+    countBadge.className = atRiskList.length > 0 ? 'exec-pill exec-pill-coral' : 'exec-pill exec-pill-green';
+  }
+
+  if (atRiskList.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 2rem 1rem; text-align: center; color: var(--exec-soft-green);">
+        <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom: 0.5rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p style="margin: 0; font-size: 0.88rem; font-weight: 600;">Todo en orden</p>
+        <p style="margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--text-muted);">No se detectan desviaciones ni atrasos en esta cartera.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = atRiskList.map(proj => {
+    const isDelayed = proj.health === 'delayed';
+    const pillClass = isDelayed ? 'exec-pill-coral' : 'exec-pill-amber';
+    const initials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+    let reason = '';
+    if (isDelayed) {
+      reason = `Fecha de entrega (${proj.deliveryDate || 'Entrega'}) no cumplida.`;
+    } else {
+      const overduePhase = proj.phases.find(p => p.state !== 'Finalizado' && p.endDate && parseDate(p.endDate) < new Date());
+      if (overduePhase) {
+        reason = `Fase intermedia "${overduePhase.phase}" atrasada (${overduePhase.endDate}).`;
+      } else if (proj.daysRemaining !== null && proj.daysRemaining <= 7) {
+        reason = `Entrega cercana (${proj.daysRemaining}d restantes) con avance rezagado (${proj.overallProgress}%).`;
+      } else {
+        reason = 'Proyecto con inicio pendiente o riesgo en cronograma.';
+      }
+    }
+
+    return `
+      <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-left: 3px solid ${isDelayed ? 'var(--exec-soft-coral)' : 'var(--exec-soft-amber)'}; border-radius: 10px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+            <strong style="font-size: 0.85rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${proj.name}</strong>
+            <span class="exec-pill ${pillClass}" style="font-size: 0.65rem; padding: 0.1rem 0.45rem;">${proj.healthLabel}</span>
+          </div>
+          <div style="font-size: 0.74rem; color: var(--text-muted);">${reason}</div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+          <div style="text-align: right;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: ${isDelayed ? 'var(--exec-soft-coral)' : 'var(--exec-soft-amber)'};">${proj.overallProgress}%</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">${proj.client}</div>
+          </div>
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #e0e7ff;" title="${proj.responsible || 'Sin asignar'}">
+            ${initials}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderExecutiveDeliveries(projects) {
+  const container = document.getElementById('execDeliveriesList');
+  if (!container) return;
+
+  const deliveries = projects
+    .filter(p => p.status !== 'Completado' && p.deliveryDate)
+    .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999))
+    .slice(0, 6);
+
+  if (deliveries.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 2rem 1rem; text-align: center; color: var(--text-muted);">
+        <p style="margin: 0; font-size: 0.85rem;">No hay entregas registradas en esta vista.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = deliveries.map(proj => {
+    const days = proj.daysRemaining;
+    let daysBadge = '';
+    if (days !== null) {
+      if (days < 0) {
+        daysBadge = `<span class="exec-pill exec-pill-coral">Vencido hace ${Math.abs(days)}d</span>`;
+      } else if (days === 0) {
+        daysBadge = `<span class="exec-pill exec-pill-coral">¡Entrega Hoy!</span>`;
+      } else if (days <= 7) {
+        daysBadge = `<span class="exec-pill exec-pill-amber">Quedan ${days}d</span>`;
+      } else {
+        daysBadge = `<span class="exec-pill exec-pill-blue">Quedan ${days}d</span>`;
+      }
+    }
+
+    return `
+      <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <strong style="font-size: 0.85rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${proj.name}</strong>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">(${proj.client})</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.74rem; color: var(--text-muted);">
+            <span>Fecha: <strong style="color: #cbd5e1;">${proj.deliveryDate}</strong></span>
+            <span>·</span>
+            <span>Resp: ${proj.responsible || 'Sin asignar'}</span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+          ${daysBadge}
+          <div style="width: 50px; text-align: right; font-weight: 700; font-size: 0.85rem; color: var(--text-main);">
+            ${proj.overallProgress}%
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderExecutiveHealthFilters() {
+  const container = document.getElementById('execHealthFilters');
+  if (!container) return;
+
+  const filters = [
+    { key: 'all', label: 'Todos' },
+    { key: 'on_track', label: 'A Tiempo' },
+    { key: 'at_risk', label: 'En Riesgo' },
+    { key: 'delayed', label: 'Retrasados' },
+    { key: 'completed', label: 'Completados' }
+  ];
+
+  container.innerHTML = filters.map(f => {
+    const isActive = (appState.execHealthFilter || 'all') === f.key;
+    return `
+      <button onclick="window.setExecutiveHealthFilter('${f.key}')" class="status-filter-btn ${isActive ? 'active' : ''}" style="font-size: 0.72rem; padding: 0.25rem 0.65rem; border-radius: 999px; border: 1px solid var(--card-border); background: ${isActive ? 'var(--accent-primary)' : 'rgba(255,255,255,0.04)'}; color: ${isActive ? 'white' : 'var(--text-muted)'}; cursor: pointer;">
+        ${f.label}
+      </button>
+    `;
+  }).join('');
+}
+
+window.setExecutiveHealthFilter = function(filterKey) {
+  appState.execHealthFilter = filterKey;
+  renderExecutiveHealthFilters();
+  const projects = getExecutiveProjects();
+  renderExecutiveProjectsTable(projects);
+};
+
+function renderExecutiveProjectsTable(projects) {
+  const tbody = document.getElementById('execProjectsTableBody');
+  if (!tbody) return;
+
+  let filtered = projects;
+
+  // Filter by health
+  if (appState.execHealthFilter && appState.execHealthFilter !== 'all') {
+    filtered = filtered.filter(p => p.health === appState.execHealthFilter);
+  }
+
+  // Filter by search query
+  if (appState.execSearchQuery) {
+    const q = appState.execSearchQuery.toLowerCase();
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(q) ||
+      (p.responsible && p.responsible.toLowerCase().includes(q)) ||
+      (p.client && p.client.toLowerCase().includes(q))
+    );
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: 0.88rem;">
+          No se encontraron proyectos con los filtros seleccionados.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(proj => {
+    let healthPill = '';
+    if (proj.health === 'on_track') healthPill = '<span class="exec-pill exec-pill-green">A Tiempo</span>';
+    else if (proj.health === 'at_risk') healthPill = '<span class="exec-pill exec-pill-amber">En Riesgo</span>';
+    else if (proj.health === 'delayed') healthPill = '<span class="exec-pill exec-pill-coral">Retrasado</span>';
+    else healthPill = '<span class="exec-pill exec-pill-blue">Completado</span>';
+
+    return `
+      <tr>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 0.9rem; margin-bottom: 0.15rem;">
+            ${proj.name}
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">
+            ${proj.phases.length} fases configuradas
+          </div>
+        </td>
+        <td>
+          <span class="exec-pill exec-pill-purple" style="font-size: 0.72rem;">${proj.client || 'General'}</span>
+        </td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.84rem;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(99,102,241,0.2); color: #a5b4fc; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700;">
+              ${(proj.responsible || '?')[0].toUpperCase()}
+            </div>
+            <span>${proj.responsible || 'Sin asignar'}</span>
+          </div>
+        </td>
+        <td>
+          <span style="font-size: 0.8rem; font-weight: 500; color: ${PHASE_COLORS[proj.currentPhase] || 'var(--text-muted)'};">
+            ${proj.currentPhase}
+          </span>
+        </td>
+        <td style="min-width: 140px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.75rem;">
+            <span style="color: var(--text-muted);">${proj.status}</span>
+            <strong style="color: var(--text-main);">${proj.overallProgress}%</strong>
+          </div>
+          <div class="exec-progress-wrap">
+            <div class="exec-progress-fill" style="width: ${proj.overallProgress}%; background: ${(proj.overallProgress === 100) ? 'var(--exec-soft-blue)' : 'linear-gradient(90deg, #6366f1, #6ee7b7)'};"></div>
+          </div>
+        </td>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;">
+            ${healthPill}
+            <span style="font-size: 0.72rem; color: var(--text-muted);">
+              Entrega: ${proj.deliveryDate || 'Sin definir'}
+            </span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ─── Gemini AI Executive Briefing ──────────────────────────────────────────
+window.generateExecutiveBriefing = async function() {
+  const modal = document.getElementById('executiveAiModal');
+  const contentEl = document.getElementById('executiveAiModalContent');
+  if (!modal || !contentEl) return;
+
+  modal.classList.add('active');
+  contentEl.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 3rem 1rem; gap: 1rem; color: var(--text-muted);">
+      <div class="spinner"></div>
+      <p style="font-size: 0.95rem; color: #c7d2fe;">Analizando cartera con Gemini AI y redactando minuta ejecutiva...</p>
+    </div>
+  `;
+
+  const apiKey = localStorage.getItem('geminiApiKey') || localStorage.getItem('gemini_api_key');
+  if (!apiKey) {
+    contentEl.innerHTML = `
+      <div style="padding: 1.5rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; color: #fca5a5;">
+        <h4 style="margin: 0 0 0.5rem; color: #f87171;">API Key requerida</h4>
+        <p style="margin: 0 0 1rem; font-size: 0.85rem;">Para generar la minuta ejecutiva con inteligencia artificial, debes configurar tu API Key de Gemini en Ajustes.</p>
+        <button onclick="document.getElementById('executiveAiModal').classList.remove('active'); openSettingsModal();" class="primary" style="font-size: 0.8rem; padding: 0.4rem 1rem;">
+          Ir a Configuración
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const projects = getExecutiveProjects();
+  const total = projects.length;
+  const onTrack = projects.filter(p => p.health === 'on_track');
+  const atRisk = projects.filter(p => p.health === 'at_risk');
+  const delayed = projects.filter(p => p.health === 'delayed');
+  const completed = projects.filter(p => p.health === 'completed');
+
+  let payload = `
+INFORMACIÓN DE LA CARTERA DE PROYECTOS (${appState.execSelectedClient === 'all' ? 'Portafolio Global' : appState.execSelectedClient}):
+- Total de Proyectos: ${total}
+- A Tiempo: ${onTrack.length} (${onTrack.map(p => p.name).join(', ') || 'Ninguno'})
+- En Riesgo: ${atRisk.length} (${atRisk.map(p => `${p.name} [${p.overallProgress}% - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
+- Retrasados: ${delayed.length} (${delayed.map(p => `${p.name} [${p.overallProgress}% - Entrega: ${p.deliveryDate} - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
+- Completados: ${completed.length} (${completed.map(p => p.name).join(', ') || 'Ninguno'})
+
+DETALLE DE COMENTARIOS DESTACADOS EN FASES:
+${projects.flatMap(p => p.phases.filter(ph => ph.comment).map(ph => `* [${p.name} - ${ph.phase}]: ${ph.comment}`)).join('\n') || 'Sin comentarios críticos.'}
+`;
+
+  const prompt = `
+Actúa como un Director de Operaciones y Project Management Office (PMO) de alto nivel.
+Genera una Minuta y Briefing Ejecutivo dirigida a la Gerencia General y Jefaturas.
+
+Datos actuales:
+${payload}
+
+Instrucciones de formato:
+1. **Resumen Ejecutivo**: Diagnóstico breve y claro del estado global (máx. 3 líneas).
+2. **Alertas Críticas y Proyectos en Foco**: Lista de 2-4 viñetas directas sobre los riesgos más urgentes, cuellos de botella o proyectos atrasados que requieren atención.
+3. **Próximos Hitos y Decisiones Sugeridas**: 3 recomendaciones estratégicas accionables para la mesa directiva.
+
+Utiliza un tono ejecutivo, sobrio, analítico y profesional. Usa formato Markdown limpio con encabezados claros y negritas.
+`;
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    appState.lastAiBriefingText = text;
+
+    let html = text
+      .replace(/### (.*?)\n/g, '<h4 style="color:#a5b4fc; font-size:1.05rem; margin:1.25rem 0 0.5rem;">$1</h4>')
+      .replace(/## (.*?)\n/g, '<h3 style="color:#e0e7ff; font-size:1.15rem; margin:1.5rem 0 0.5rem;">$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#ffffff;">$1</strong>')
+      .replace(/^\* (.*?)$/gm, '<li style="margin-bottom:0.4rem;">$1</li>')
+      .replace(/\n\n/g, '<p style="margin-bottom:0.8rem;"></p>');
+
+    contentEl.innerHTML = `
+      <div style="margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
+        <span class="exec-pill exec-pill-purple">Cartera: ${appState.execSelectedClient === 'all' ? 'Portafolio Global' : appState.execSelectedClient}</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Generado con Gemini AI</span>
+      </div>
+      <div>${html}</div>
+    `;
+  } catch (err) {
+    console.error("Error generating executive briefing:", err);
+    contentEl.innerHTML = `
+      <div style="padding: 1.5rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; color: #fca5a5;">
+        <p style="margin:0;">Error al generar el resumen ejecutivo: ${err.message}</p>
+      </div>
+    `;
+  }
+};
+
+window.copyExecutiveBriefing = function() {
+  if (!appState.lastAiBriefingText) return;
+  navigator.clipboard.writeText(appState.lastAiBriefingText).then(() => {
+    const copyText = document.getElementById('copyBtnText');
+    if (copyText) {
+      copyText.textContent = '¡Copiado al Portapapeles!';
+      setTimeout(() => { copyText.textContent = 'Copiar Minuta'; }, 2000);
+    }
+  });
 };
 
 function renderLogs() {
@@ -1946,8 +2539,8 @@ document.head.insertAdjacentHTML("beforeend", `
 `);
 
 // ─── User Management Panel ─────────────────────────────────────────────────────────────
-const ROLE_LABELS = { admin: 'Administrador', editor: 'Editor', lector: 'Lector' };
-const ROLE_COLORS = { admin: '#6366f1', editor: '#14b8a6', lector: '#f59e0b' };
+const ROLE_LABELS = { admin: 'Administrador', editor: 'Editor', lector: 'Lector', gerente: 'Gerente / Jefatura' };
+const ROLE_COLORS = { admin: '#6366f1', editor: '#14b8a6', lector: '#f59e0b', gerente: '#c084fc' };
 
 function openUserMgmtModal() {
   if (appState.currentUserRole !== 'admin') return;

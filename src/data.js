@@ -323,6 +323,78 @@ export function aggregateProjectData(phases) {
       proj.status = 'No iniciado';
     }
 
+    // Calculate dates & executive health
+    const parseLocalDDMMYYYY = (str) => {
+      if (!str) return null;
+      const [d, m, y] = str.split('/');
+      return new Date(+y, +m - 1, +d);
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const entregaPhase = proj.phases.find(p => p.phase === 'Entrega') || proj.phases[proj.phases.length - 1];
+    proj.deliveryDate = entregaPhase ? entregaPhase.endDate : '';
+    proj.startDate = proj.phases[0] ? proj.phases[0].startDate : '';
+
+    // Calculate days remaining to delivery
+    const deliveryDateObj = parseLocalDDMMYYYY(proj.deliveryDate);
+    if (deliveryDateObj) {
+      const diffTime = deliveryDateObj.getTime() - today.getTime();
+      proj.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    } else {
+      proj.daysRemaining = null;
+    }
+
+    // Determine current active phase
+    const inProgressPhase = proj.phases.find(p => p.state === 'En curso');
+    const notStartedPhase = proj.phases.find(p => p.state === 'No iniciado');
+    proj.currentPhase = inProgressPhase ? inProgressPhase.phase : (notStartedPhase ? notStartedPhase.phase : 'Entrega');
+
+    // Calculate Executive Health: 'completed' | 'delayed' | 'at_risk' | 'on_track'
+    if (proj.status === 'Completado') {
+      proj.health = 'completed';
+      proj.healthLabel = 'Completado';
+    } else {
+      let isDelayed = false;
+      let isAtRisk = false;
+
+      // Retrasado: ONLY when the entrega phase / project delivery date has passed without being completed
+      const entregaEnd = entregaPhase ? parseLocalDDMMYYYY(entregaPhase.endDate) : deliveryDateObj;
+      if (entregaEnd && entregaEnd < today && (!entregaPhase || entregaPhase.state !== 'Finalizado')) {
+        isDelayed = true;
+      }
+
+      // En Riesgo: intermediate phases overdue, delayed start, or delivery near with low progress
+      if (!isDelayed) {
+        proj.phases.forEach(p => {
+          const pEnd = parseLocalDDMMYYYY(p.endDate);
+          const pStart = parseLocalDDMMYYYY(p.startDate);
+          if (pEnd && pEnd < today && p.state !== 'Finalizado') {
+            isAtRisk = true;
+          }
+          if (pStart && pStart < today && p.state === 'No iniciado') {
+            isAtRisk = true;
+          }
+        });
+
+        if (proj.daysRemaining !== null && proj.daysRemaining <= 7 && proj.overallProgress < 75) {
+          isAtRisk = true;
+        }
+      }
+
+      if (isDelayed) {
+        proj.health = 'delayed';
+        proj.healthLabel = 'Retrasado';
+      } else if (isAtRisk) {
+        proj.health = 'at_risk';
+        proj.healthLabel = 'En Riesgo';
+      } else {
+        proj.health = 'on_track';
+        proj.healthLabel = 'A Tiempo';
+      }
+    }
+
     // Determine if the project is archived (if any phase is marked as archived)
     proj.isArchived = proj.phases.some(p => p.isArchived === true);
 

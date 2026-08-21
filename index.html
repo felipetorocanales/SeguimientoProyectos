@@ -160,7 +160,26 @@
         </div>
         <p class="subtitle" style="margin: 0;">Seguimiento de Proyectos</p>
       </div>
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <!-- View Switcher (Executive vs Operativo) -->
+        <div id="viewModeSelector" class="view-mode-selector">
+          <button id="viewExecBtn" class="view-mode-btn" onclick="window.switchAppView('executive')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Resumen Ejecutivo
+          </button>
+          <button id="viewMainBtn" class="view-mode-btn active" onclick="window.switchAppView('main')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            Operativo / Gantt
+          </button>
+        </div>
+
         <div id="userInfo" style="display:none; align-items:center; gap:0.5rem;">
           <!-- Admin-only: Manage Users -->
           <button id="manageUsersBtn"
@@ -211,7 +230,7 @@
       Volver al Cronograma
     </button>
 
-    <main>
+    <main id="mainSection">
       <!-- Client Navigation -->
       <nav id="clientTabs" class="client-tabs"></nav>
 
@@ -357,6 +376,130 @@
           </svg>
         </button>
       </div>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════
+         EXECUTIVE SUMMARY SECTION (GERENCIAS & JEFATURAS)
+         ═══════════════════════════════════════════════════════════════════════════ -->
+    <main id="executiveSection" style="display: none; flex-direction: column; gap: 2rem;">
+      <!-- Executive Header Banner -->
+      <div class="exec-card animate-fade-in" style="padding: 1.75rem 2rem; background: linear-gradient(135deg, rgba(30, 38, 70, 0.6) 0%, rgba(20, 24, 45, 0.7) 100%); border: 1px solid rgba(165, 180, 252, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.25rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+              <span class="exec-pill exec-pill-purple">VISTA DIRECTIVA</span>
+              <span id="execCurrentDateBadge" style="font-size: 0.78rem; color: var(--text-muted);"></span>
+            </div>
+            <h2 style="font-size: 1.6rem; font-weight: 700; margin: 0; background: linear-gradient(to right, #ffffff, #c7d2fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              Tablero de Control Ejecutivo
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0.25rem 0 0;">
+              Monitoreo estratégico de hitos, desviaciones y salud global de proyectos.
+            </p>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <!-- Client Filter for Executive -->
+            <div style="position: relative; display: flex; align-items: center;">
+              <select id="execClientFilter" class="form-select" style="background: rgba(10, 14, 26, 0.6); border: 1px solid rgba(255,255,255,0.12); color: #f3f4f6; font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 10px; cursor: pointer;">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <!-- Gemini AI Briefing Trigger -->
+            <button id="execGenerateBriefingBtn" class="btn-ai-briefing" onclick="window.generateExecutiveBriefing()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>Generar Minuta IA</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive KPI Cards Grid -->
+      <section id="execKpisContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem;">
+        <!-- Injected by JS -->
+      </section>
+
+      <!-- Split Section: Radar de Riesgos & Próximas Entregas -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+        <!-- Focos de Atención / Alertas -->
+        <div class="exec-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--exec-soft-coral-bg); border: 1px solid var(--exec-soft-coral-border); display: flex; align-items: center; justify-content: center; color: var(--exec-soft-coral);">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Radar de Riesgos & Atención</h3>
+            </div>
+            <span id="execRisksCountBadge" class="exec-pill exec-pill-coral">0 alertas</span>
+          </div>
+          <div id="execRisksList" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 280px; overflow-y: auto;">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Próximos Hitos & Entregas -->
+        <div class="exec-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--exec-soft-blue-bg); border: 1px solid var(--exec-soft-blue-border); display: flex; align-items: center; justify-content: center; color: var(--exec-soft-blue);">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </div>
+              <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Próximas Entregas Comprometidas</h3>
+            </div>
+            <span id="execDeliveriesCountBadge" class="exec-pill exec-pill-blue">Ventana 30 días</span>
+          </div>
+          <div id="execDeliveriesList" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 280px; overflow-y: auto;">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive Project Matrix Table -->
+      <section class="exec-card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0;">Matriz Ejecutiva de Proyectos</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.2rem 0 0;">Detalle condensado de cartera con semáforo de cumplimiento</p>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <div style="position: relative;">
+              <input type="text" id="execSearchInput" placeholder="Buscar en matriz..." class="form-input" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; height: 34px; width: 180px;" />
+            </div>
+            <div id="execHealthFilters" style="display: flex; gap: 0.35rem;">
+              <!-- Dynamic health filter pills -->
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="exec-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">Proyecto</th>
+                <th style="width: 14%;">Cliente</th>
+                <th style="width: 16%;">Responsable</th>
+                <th style="width: 14%;">Fase Actual</th>
+                <th style="width: 14%;">Avance</th>
+                <th style="width: 14%;">Salud / Entrega</th>
+              </tr>
+            </thead>
+            <tbody id="execProjectsTableBody">
+              <!-- Injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <!-- Logs View Section -->
@@ -639,6 +782,7 @@
               <label class="form-label">Rol / Permiso</label>
               <select id="userRole" class="form-select" onchange="window.onUserRoleChange()">
                 <option value="lector">Lector (solo visualización)</option>
+                <option value="gerente">Gerente / Jefatura (Vista Ejecutiva)</option>
                 <option value="editor" selected>Editor (puede editar)</option>
                 <option value="admin">Administrador (acceso total)</option>
               </select>
@@ -748,10 +892,49 @@
             <p id="passwordSuccess" style="display:none; color:#10b981; font-size:0.75rem; margin-bottom:1rem;"></p>
             <div style="display: flex; justify-content: flex-end;">
               <button type="submit" id="changePasswordBtn" class="primary"
-                style="padding: 0.6rem 1.5rem; background: var(--status-alert);">Actualizar y Cerrar Otros
-                Dispositivos</button>
+                style="padding: 0.6rem 1.5rem; background: var(--status-alert);">Actualizar y Cerrar Otros Dispositivos</button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Executive AI Briefing Modal -->
+  <div id="executiveAiModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div
+            style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;">
+            <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-size:1.15rem; margin:0;">Minuta y Briefing Ejecutivo IA</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Resumen estratégico generado por Gemini AI</p>
+          </div>
+        </div>
+        <button id="closeExecutiveAiModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="executiveAiModalContent" class="custom-scrollbar"
+          style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; max-height: 400px; overflow-y: auto; font-size: 0.9rem; line-height: 1.6; color: var(--text-main);">
+          <!-- Dynamic briefing injected here -->
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
+          <button id="copyExecutiveBriefingBtn" class="glass-card"
+            style="padding: 0.55rem 1.2rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;"
+            onclick="window.copyExecutiveBriefing()">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span id="copyBtnText">Copiar Minuta</span>
+          </button>
+          <button class="primary" style="padding: 0.55rem 1.5rem;"
+            onclick="document.getElementById('executiveAiModal').classList.remove('active')">Cerrar</button>
         </div>
       </div>
     </div>
