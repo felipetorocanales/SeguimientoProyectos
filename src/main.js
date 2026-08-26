@@ -2052,12 +2052,310 @@ function renderExecutiveView() {
 
   const projects = getExecutiveProjects();
 
+  renderExecutiveCustomKPIs(projects);
+  renderExecutiveScatterPlot(projects);
   renderExecutiveKPIs(projects);
   renderExecutiveRisks(projects);
   renderExecutiveDeliveries(projects);
   renderExecutiveHealthFilters();
   renderExecutiveProjectsTable(projects);
 }
+
+function renderExecutiveCustomKPIs(projects) {
+  const container = document.getElementById('execCustomKpisContainer');
+  if (!container) return;
+
+  const total = projects.length;
+  const completed = projects.filter(p => p.status === 'Completado').length;
+
+  // SLA = percentage of projects not delayed
+  const delayed = projects.filter(p => p.health === 'delayed').length;
+  const slaVal = total > 0 ? Math.round(((total - delayed) / total) * 100) : 100;
+
+  // Average business days to finish a project
+  const parseLocalDDMMYYYY = (str) => {
+    if (!str) return null;
+    const [d, m, y] = str.split('/');
+    return new Date(+y, +m - 1, +d);
+  };
+
+  const calculateBusinessDays = (startStr, endStr) => {
+    if (!startStr || !endStr) return null;
+    const start = parseLocalDDMMYYYY(startStr);
+    const end = parseLocalDDMMYYYY(endStr);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+    if (start > end) return 0;
+    
+    let count = 0;
+    let cur = new Date(start);
+    while (cur <= end) {
+      const day = cur.getDay();
+      if (day !== 0 && day !== 6) { // 0 = Sunday, 6 = Saturday
+        count++;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  };
+
+  const completedProjects = projects.filter(p => p.status === 'Completado');
+  let totalDays = 0;
+  let completedWithDates = 0;
+  completedProjects.forEach(p => {
+    const days = calculateBusinessDays(p.startDate, p.deliveryDate);
+    if (days !== null) {
+      totalDays += days;
+      completedWithDates++;
+    }
+  });
+
+  let avgLabel = 'Días hábiles promedio (Proyectos Completados)';
+  let avgVal = completedWithDates > 0 ? Math.round(totalDays / completedWithDates) : null;
+  if (avgVal === null) {
+    // Fallback to active projects planned duration
+    let activeDays = 0;
+    let activeWithDates = 0;
+    projects.filter(p => p.status !== 'Completado').forEach(p => {
+      const days = calculateBusinessDays(p.startDate, p.deliveryDate);
+      if (days !== null) {
+        activeDays += days;
+        activeWithDates++;
+      }
+    });
+    avgVal = activeWithDates > 0 ? Math.round(activeDays / activeWithDates) : 0;
+    avgLabel = 'Días hábiles promedio (Proyectos Activos)';
+  }
+
+  // Recommendation logic
+  let recommendation = '';
+  let recIcon = '';
+  let recColor = '';
+  if (total === 0) {
+    recommendation = 'No hay proyectos en esta cartera para generar recomendaciones.';
+    recIcon = 'ℹ️';
+    recColor = 'var(--text-muted)';
+  } else if (slaVal < 80) {
+    recommendation = `SLA crítico (${slaVal}%). Se sugiere revisar cuellos de botella e incrementar recursos en fases finales.`;
+    recIcon = '⚠️';
+    recColor = 'var(--exec-soft-coral)';
+  } else if (delayed > 0) {
+    recommendation = `Hay ${delayed} proyecto(s) retrasado(s). Priorizar cierres de la fase de entrega para normalizar la cartera.`;
+    recIcon = '⚡';
+    recColor = 'var(--exec-soft-amber)';
+  } else if (slaVal >= 95) {
+    recommendation = 'Excelente rendimiento general. Portafolio alineado al cronograma comprometido. Mantener esquema actual.';
+    recIcon = '🏆';
+    recColor = 'var(--exec-soft-green)';
+  } else {
+    recommendation = 'Cartera operativa estable. Monitorear los proyectos en riesgo para evitar desviaciones en fechas de entrega.';
+    recIcon = '📈';
+    recColor = 'var(--exec-soft-blue)';
+  }
+
+  container.innerHTML = `
+    <!-- Card 1: Cantidad de proyectos -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Cantidad Proyectos</div>
+      <div style="font-size: 2rem; font-weight: 800; color: var(--text-main);">${total}</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Registrados en cartera</div>
+    </div>
+
+    <!-- Card 2: Cantidad de proyectos completados -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Proyectos Completados</div>
+      <div style="font-size: 2rem; font-weight: 800; color: var(--exec-soft-blue);">${completed}</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Finalizados con 100% de avance</div>
+    </div>
+
+    <!-- Card 3: SLA -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Nivel de SLA</div>
+      <div style="font-size: 2rem; font-weight: 800; color: ${slaVal >= 90 ? 'var(--exec-soft-green)' : (slaVal >= 80 ? 'var(--exec-soft-amber)' : 'var(--exec-soft-coral)')};">${slaVal}%</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Proporción de proyectos sin retrasos</div>
+    </div>
+
+    <!-- Card 4: Días laborales promedio -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Días Hábiles Promedio</div>
+      <div style="font-size: 2rem; font-weight: 800; color: var(--text-main);">${avgVal} <span style="font-size: 1rem; font-weight: 400; color: var(--text-muted);">días</span></div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${avgLabel}</div>
+    </div>
+
+    <!-- Card 5: Recomendación -->
+    <div class="exec-card" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; border-left: 3px solid ${recColor};">
+      <div>
+        <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Recomendación PMO</div>
+        <div style="font-size: 0.78rem; line-height: 1.4; color: var(--text-main); font-style: italic;">
+          ${recIcon} "${recommendation}"
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderExecutiveScatterPlot(projects) {
+  const container = document.getElementById('execScatterPlotContainer');
+  if (!container) return;
+
+  const parseLocalDDMMYYYY = (str) => {
+    if (!str) return null;
+    const [d, m, y] = str.split('/');
+    return new Date(+y, +m - 1, +d);
+  };
+
+  const formatDateShort = (date) => {
+    if (!date) return '';
+    const d = date.getDate().toString().padStart(2, '0');
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${d}/${m}`;
+  };
+
+  const dataPoints = projects
+    .map(p => ({
+      name: p.name,
+      client: p.client,
+      progress: p.overallProgress || 0,
+      health: p.health,
+      healthLabel: p.healthLabel,
+      deliveryDateStr: p.deliveryDate,
+      dateObj: parseLocalDDMMYYYY(p.deliveryDate)
+    }))
+    .filter(dp => dp.dateObj)
+    .sort((a, b) => a.dateObj - b.dateObj);
+
+  if (dataPoints.length === 0) {
+    container.innerHTML = `
+      <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--text-main);">Cronograma de Cumplimiento (Entregas vs. Progreso)</h3>
+      <div style="padding: 3rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+        No hay suficientes proyectos con fecha de entrega para graficar en esta cartera.
+      </div>
+    `;
+    return;
+  }
+
+  const width = 800;
+  const height = 280;
+  const paddingLeft = 50;
+  const paddingRight = 40;
+  const paddingTop = 20;
+  const paddingBottom = 40;
+
+  const minTime = Math.min(...dataPoints.map(dp => dp.dateObj.getTime()));
+  const maxTime = Math.max(...dataPoints.map(dp => dp.dateObj.getTime()));
+
+  let timeRange = maxTime - minTime;
+  if (timeRange === 0) {
+    timeRange = 1000 * 60 * 60 * 24 * 10;
+  }
+
+  const getX = (time) => {
+    return paddingLeft + ((time - minTime) / timeRange) * (width - paddingLeft - paddingRight);
+  };
+
+  const getY = (progress) => {
+    return height - paddingBottom - (progress / 100) * (height - paddingTop - paddingBottom);
+  };
+
+  let gridYHtml = '';
+  for (let p = 0; p <= 100; p += 25) {
+    const yVal = getY(p);
+    gridYHtml += `
+      <line x1="${paddingLeft}" y1="${yVal}" x2="${width - paddingRight}" y2="${yVal}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+      <text x="${paddingLeft - 10}" y="${yVal + 4}" fill="var(--text-muted)" font-size="10" text-anchor="end">${p}%</text>
+    `;
+  }
+
+  let gridXHtml = '';
+  const numLabels = Math.min(dataPoints.length, 5);
+  const step = Math.max(1, Math.floor(dataPoints.length / numLabels));
+  for (let i = 0; i < dataPoints.length; i += step) {
+    const dp = dataPoints[i];
+    const xVal = getX(dp.dateObj.getTime());
+    gridXHtml += `
+      <line x1="${xVal}" y1="${paddingTop}" x2="${xVal}" y2="${height - paddingBottom}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" stroke-width="1" />
+      <text x="${xVal}" y="${height - paddingBottom + 16}" fill="var(--text-muted)" font-size="10" text-anchor="middle">${formatDateShort(dp.dateObj)}</text>
+    `;
+  }
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  let todayLineHtml = '';
+  if (today.getTime() >= minTime && today.getTime() <= maxTime) {
+    const xToday = getX(today.getTime());
+    todayLineHtml = `
+      <line x1="${xToday}" y1="${paddingTop}" x2="${xToday}" y2="${height - paddingBottom}" stroke="var(--exec-soft-coral)" stroke-width="1.5" stroke-dasharray="4,2" />
+      <text x="${xToday + 4}" y="${paddingTop + 12}" fill="var(--exec-soft-coral)" font-size="9" font-weight="600">HOY</text>
+    `;
+  }
+
+  const xCriticalBoundary = getX(today.getTime());
+  let criticalZoneHtml = '';
+  if (today.getTime() >= minTime) {
+    const criticalWidth = xCriticalBoundary - paddingLeft;
+    if (criticalWidth > 0) {
+      const topY = getY(100);
+      const bottomY = getY(0);
+      criticalZoneHtml = `
+        <rect x="${paddingLeft}" y="${topY}" width="${criticalWidth}" height="${bottomY - topY}" fill="rgba(239, 68, 68, 0.02)" />
+        <text x="${paddingLeft + 10}" y="${height - paddingBottom - 10}" fill="rgba(239, 68, 68, 0.3)" font-size="9" font-weight="600">ZONA CRÍTICA (VENCIDOS)</text>
+      `;
+    }
+  }
+
+  const dotsHtml = dataPoints.map((dp) => {
+    const cx = getX(dp.dateObj.getTime());
+    const cy = getY(dp.progress);
+
+    let dotColor = 'var(--exec-soft-green)';
+    if (dp.health === 'completed') dotColor = 'var(--exec-soft-blue)';
+    else if (dp.health === 'at_risk') dotColor = 'var(--exec-soft-amber)';
+    else if (dp.health === 'delayed') dotColor = 'var(--exec-soft-coral)';
+
+    return `
+      <g class="chart-dot" style="cursor: pointer;" onclick="window.highlightProjectInMatrix('${dp.name}')">
+        <circle cx="${cx}" cy="${cy}" r="7" fill="${dotColor}" stroke="rgba(255,255,255,0.2)" stroke-width="1.5">
+          <title>${dp.name} (${dp.client})\nProgreso: ${dp.progress}%\nEntrega: ${dp.deliveryDateStr}\nSalud: ${dp.healthLabel}</title>
+        </circle>
+        <circle cx="${cx}" cy="${cy}" r="12" fill="transparent" />
+      </g>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; color: var(--text-main);">Cronograma de Cumplimiento (Entregas vs. Progreso)</h3>
+      <span style="font-size: 0.72rem; color: var(--text-muted);">Pasa el cursor sobre los puntos para ver detalles · Clic para buscar en la matriz</span>
+    </div>
+    <div style="position: relative; width: 100%; overflow-x: auto; background: rgba(10,14,26,0.35); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 1rem 0.5rem 0.5rem 0.5rem;">
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" style="min-width: 600px; display: block;">
+        ${criticalZoneHtml}
+        ${gridYHtml}
+        ${gridXHtml}
+        ${todayLineHtml}
+        
+        <line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
+        <line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
+        
+        ${dotsHtml}
+      </svg>
+    </div>
+  `;
+}
+
+window.highlightProjectInMatrix = function(projName) {
+  const searchInput = document.getElementById('execSearchInput');
+  if (searchInput) {
+    searchInput.value = projName;
+    appState.execSearchQuery = projName.toLowerCase().trim();
+    const filtered = getExecutiveProjects();
+    renderExecutiveProjectsTable(filtered);
+    
+    const tableBody = document.getElementById('execProjectsTableBody');
+    if (tableBody) {
+      tableBody.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+};
 
 function renderExecutiveKPIs(projects) {
   const container = document.getElementById('execKpisContainer');
