@@ -558,8 +558,8 @@ const MONTH_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 function weekLabel(date) {
   return `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
 }
-const GANTT_COLORS = ['#6366f1','#14b8a6','#ec4899','#f59e0b','#3b82f6','#8b5cf6'];
-const PHASE_COLORS = { 'Levantamiento':'#6366f1', 'Desarrollo':'#14b8a6', 'Testing/QA':'#ec4899', 'Entrega':'#f59e0b' };
+const GANTT_COLORS = ['#2563eb', '#00d2ff', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4'];
+const PHASE_COLORS = { 'Levantamiento':'#2563eb', 'Desarrollo':'#00d2ff', 'Testing/QA':'#f59e0b', 'Entrega':'#10b981' };
 
 function getWeeksForPhases(phases) {
   let allDates = [];
@@ -872,7 +872,7 @@ function renderGantt() {
         onclick="window.scrollToProject('${ganttSafeId}')"
         onmouseenter="window.handleGanttHover(event, '${proj.id}')"
         onmouseleave="window.handleGanttLeave(event)"
-        style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 1.25rem; font-size:0.85rem; font-weight:600; background: color-mix(in srgb, ${color} 10%, #111420); border-right:2px solid ${color}; position:sticky; left:0; z-index:5; overflow:visible; white-space:normal; line-height:1.3; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5); cursor:pointer; transition: background 0.2s;"
+        style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 1.25rem; font-size:0.85rem; font-weight:600; background: color-mix(in srgb, ${color} 10%, #071536); border-right:2px solid ${color}; position:sticky; left:0; z-index:5; overflow:visible; white-space:normal; line-height:1.3; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5); cursor:pointer; transition: background 0.2s;"
       >
         <span style="display:block; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); color:var(--text-main); pointer-events:none;">
           ${proj.name}
@@ -893,7 +893,7 @@ function renderGantt() {
       <table style="border-collapse:collapse; width:100%; table-layout:fixed;">
       <colgroup><col style="width:${LABEL_W}px;">${timeline.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
     <thead><tr>
-      <th style="position:sticky; left:0; z-index:6; background:#111420; min-width:${LABEL_W}px; padding:0.8rem 1.25rem; font-size:0.75rem; font-weight:700; color:var(--text-muted); text-align:left; border-right:1px solid var(--card-border); border-bottom:1px solid var(--card-border); text-transform:uppercase; letter-spacing:0.05em; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5);">Proyecto</th>
+      <th style="position:sticky; left:0; z-index:6; background:#061330; min-width:${LABEL_W}px; padding:0.8rem 1.25rem; font-size:0.75rem; font-weight:700; color:#38bdf8; text-align:left; border-right:1px solid rgba(56, 189, 248, 0.2); border-bottom:1px solid rgba(56, 189, 248, 0.2); text-transform:uppercase; letter-spacing:0.05em; box-shadow: 8px 0 12px -8px rgba(0,0,0,0.5);">Proyecto</th>
       ${headerCells}
     </tr></thead>
     <tbody style="background:rgba(0,0,0,0.1);">${rowsHtml}</tbody>
@@ -2326,15 +2326,15 @@ function renderExecutiveScatterPlot(projects) {
       <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; color: var(--text-main);">Cronograma de Cumplimiento (Entregas vs. Progreso)</h3>
       <span style="font-size: 0.72rem; color: var(--text-muted);">Pasa el cursor sobre los puntos para ver detalles · Clic para buscar en la matriz</span>
     </div>
-    <div style="position: relative; width: 100%; overflow-x: auto; background: rgba(10,14,26,0.35); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 1rem 0.5rem 0.5rem 0.5rem;">
+    <div style="position: relative; width: 100%; overflow-x: auto; background: rgba(3, 11, 30, 0.65); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2); padding: 1rem 0.5rem 0.5rem 0.5rem;">
       <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" style="min-width: 600px; display: block;">
         ${criticalZoneHtml}
         ${gridYHtml}
         ${gridXHtml}
         ${todayLineHtml}
         
-        <line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
-        <line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
+        <line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="rgba(56, 189, 248, 0.2)" stroke-width="1" />
+        <line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="rgba(56, 189, 248, 0.2)" stroke-width="1" />
         
         ${dotsHtml}
       </svg>
@@ -2854,7 +2854,7 @@ document.head.insertAdjacentHTML("beforeend", `
 
 // ─── User Management Panel ─────────────────────────────────────────────────────────────
 const ROLE_LABELS = { admin: 'Administrador', editor: 'Editor', lector: 'Lector', gerente: 'Gerente / Jefatura' };
-const ROLE_COLORS = { admin: '#6366f1', editor: '#14b8a6', lector: '#f59e0b', gerente: '#c084fc' };
+const ROLE_COLORS = { admin: '#2563eb', editor: '#00d2ff', lector: '#f59e0b', gerente: '#8b5cf6' };
 
 function openUserMgmtModal() {
   if (appState.currentUserRole !== 'admin') return;

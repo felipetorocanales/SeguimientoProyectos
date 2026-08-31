@@ -85,12 +85,12 @@
 
   <!-- ═══ LOGIN SCREEN (shown until authenticated) ═══ -->
   <div id="loginScreen"
-    style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0d0f17 0%,#161a2b 60%,#1a0f2e 100%);display:flex;align-items:center;justify-content:center;">
+    style="position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 30%, #0e245c 0%, #061233 50%, #020714 100%);display:flex;align-items:center;justify-content:center;">
     <div style="width:100%;max-width:420px;padding:2rem;">
       <!-- Logo / Brand -->
       <div style="text-align:center;margin-bottom:2.5rem;">
         <div
-          style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 32px rgba(99,102,241,0.4);margin-bottom:1.25rem;">
+          style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#1d4ed8,#00d2ff);box-shadow:0 8px 32px rgba(0,210,255,0.35);margin-bottom:1.25rem;">
           <svg width="32" height="32" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -99,32 +99,32 @@
           </svg>
         </div>
         <h1
-          style="font-size:2rem;font-weight:700;background:linear-gradient(to right,#e0e7ff,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.25rem;">
+          style="font-size:2rem;font-weight:700;background:linear-gradient(to right,#ffffff,#60a5fa,#00d2ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.25rem;">
           Nexus Tracker</h1>
-        <p style="color:#6b7280;font-size:0.9rem;">Ingresa tus credenciales para continuar</p>
+        <p style="color:#38bdf8;font-size:0.9rem;font-weight:500;">Ingresa tus credenciales para continuar</p>
       </div>
       <!-- Login Card -->
       <div
-        style="background:rgba(26,31,53,0.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:2rem;box-shadow:0 24px 64px rgba(0,0,0,0.4);">
+        style="background:rgba(6,18,46,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(56,189,248,0.25);border-radius:20px;padding:2rem;box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 20px rgba(0,210,255,0.1);">
         <form id="loginScreenForm" autocomplete="on">
           <div style="margin-bottom:1.25rem;">
-            <label style="display:block;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;font-weight:500;">Correo
+            <label style="display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:0.5rem;font-weight:500;">Correo
               electrónico</label>
             <input type="email" id="loginScreenEmail" autocomplete="email" required
-              style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:0.8rem 1rem;color:#f3f4f6;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
-              placeholder="usuario@empresa.com" onfocus="this.style.borderColor='#6366f1'"
-              onblur="this.style.borderColor='rgba(255,255,255,0.08)'" />
+              style="width:100%;background:rgba(3,11,30,0.6);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:0.8rem 1rem;color:#f8fafc;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
+              placeholder="usuario@empresa.com" onfocus="this.style.borderColor='#00d2ff'"
+              onblur="this.style.borderColor='rgba(56,189,248,0.2)'" />
           </div>
           <div style="margin-bottom:1.5rem;">
             <label
-              style="display:block;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;font-weight:500;">Contraseña</label>
+              style="display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:0.5rem;font-weight:500;">Contraseña</label>
             <div style="position:relative;">
               <input type="password" id="loginScreenPassword" autocomplete="current-password" required
-                style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:0.8rem 2.75rem 0.8rem 1rem;color:#f3f4f6;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
-                placeholder="••••••••" onfocus="this.style.borderColor='#6366f1'"
-                onblur="this.style.borderColor='rgba(255,255,255,0.08)'" />
+                style="width:100%;background:rgba(3,11,30,0.6);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:0.8rem 2.75rem 0.8rem 1rem;color:#f8fafc;font-family:inherit;font-size:0.95rem;outline:none;transition:border-color 0.2s;"
+                placeholder="••••••••" onfocus="this.style.borderColor='#00d2ff'"
+                onblur="this.style.borderColor='rgba(56,189,248,0.2)'" />
               <button type="button" id="loginScreenTogglePwd"
-                style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;color:#6b7280;cursor:pointer;">
+                style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;color:#94a3b8;cursor:pointer;">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                   <circle cx="12" cy="12" r="3" />
@@ -136,14 +136,14 @@
             style="display:none;color:#f87171;font-size:0.8rem;margin-bottom:1rem;padding:0.6rem 0.75rem;background:rgba(239,68,68,0.1);border-radius:8px;border-left:3px solid #f87171;">
           </p>
           <button type="submit" id="loginScreenSubmitBtn"
-            style="width:100%;padding:0.85rem;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;border-radius:10px;color:white;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 16px rgba(99,102,241,0.35);letter-spacing:0.02em;"
-            onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(99,102,241,0.45)';"
-            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(99,102,241,0.35)';">Iniciar
-            sesión</button>
+            style="width:100%;padding:0.85rem;background:linear-gradient(135deg,#1d4ed8,#0284c7);border:1px solid rgba(56,189,248,0.4);border-radius:10px;color:white;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 16px rgba(0,210,255,0.3);letter-spacing:0.02em;"
+            onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(0,210,255,0.45)';this.style.borderColor='rgba(0,210,255,0.8)';"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,210,255,0.3)';this.style.borderColor='rgba(56,189,248,0.4)';">
+            Ingresar al Sistema
+          </button>
         </form>
       </div>
-      <p style="text-align:center;margin-top:1.5rem;color:#374151;font-size:0.78rem;">Acceso restringido · Solo usuarios
-        autorizados</p>
+      <p style="text-align:center;margin-top:1.5rem;color:#38bdf8;opacity:0.6;font-size:0.78rem;">Acceso restringido · Solo usuarios autorizados</p>
     </div>
   </div>
   <div id="app">
@@ -200,7 +200,7 @@
             Logs
           </button>
           <div
-            style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;"
+            style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#00d2ff);box-shadow:0 0 10px rgba(0,210,255,0.35);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;"
             id="userAvatar">?</div>
           <span id="userEmail"
             style="font-size:0.8rem;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
@@ -210,8 +210,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
               </path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
             Ajustes
           </button>
@@ -223,7 +222,7 @@
 
     <!-- Floating Return Button -->
     <button id="returnToGanttBtn"
-      style="position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%) translateY(-100px); z-index: 1000; background: var(--accent-primary); color: white; padding: 0.6rem 1.2rem; border-radius: 999px; border: none; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.5); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; pointer-events: none;">
+      style="position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%) translateY(-100px); z-index: 1000; background: linear-gradient(135deg, #1d4ed8, #00d2ff); color: white; padding: 0.6rem 1.2rem; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.4); font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; box-shadow: 0 10px 25px rgba(0, 210, 255, 0.45); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; pointer-events: none;">
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
         <path d="M5 10l7-7m0 0l7 7m-7-7v18" />
       </svg>
@@ -383,14 +382,14 @@
          ═══════════════════════════════════════════════════════════════════════════ -->
     <main id="executiveSection" style="display: none; flex-direction: column; gap: 2rem;">
       <!-- Executive Header Banner -->
-      <div class="exec-card animate-fade-in" style="padding: 1.75rem 2rem; background: linear-gradient(135deg, rgba(30, 38, 70, 0.6) 0%, rgba(20, 24, 45, 0.7) 100%); border: 1px solid rgba(165, 180, 252, 0.15);">
+      <div class="exec-card animate-fade-in" style="padding: 1.75rem 2rem; background: linear-gradient(135deg, rgba(14, 36, 92, 0.75) 0%, rgba(6, 18, 46, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.3);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.25rem;">
           <div>
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span class="exec-pill exec-pill-purple">VISTA DIRECTIVA</span>
-              <span id="execCurrentDateBadge" style="font-size: 0.78rem; color: var(--text-muted);"></span>
+              <span id="execCurrentDateBadge" style="font-size: 0.78rem; color: #38bdf8;"></span>
             </div>
-            <h2 style="font-size: 1.6rem; font-weight: 700; margin: 0; background: linear-gradient(to right, #ffffff, #c7d2fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <h2 style="font-size: 1.6rem; font-weight: 700; margin: 0; background: linear-gradient(to right, #ffffff, #60a5fa, #00d2ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
               Tablero de Control Ejecutivo
             </h2>
             <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0.25rem 0 0;">
@@ -401,7 +400,7 @@
           <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
             <!-- Client Filter for Executive -->
             <div style="position: relative; display: flex; align-items: center;">
-              <select id="execClientFilter" class="form-select" style="background: rgba(10, 14, 26, 0.6); border: 1px solid rgba(255,255,255,0.12); color: #f3f4f6; font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 10px; cursor: pointer;">
+              <select id="execClientFilter" class="form-select" style="background: rgba(3, 11, 30, 0.75); border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 10px; cursor: pointer;">
                 <!-- Populated dynamically -->
               </select>
             </div>
