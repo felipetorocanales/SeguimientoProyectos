@@ -1,7 +1,7 @@
 /**
  * telegram.js - Telegram Bot Webhook Handler for Nexus Tracker
  *
- * Receives updates from Telegram and replies using standard Telegram Bot API.
+ * Receives updates from Telegram and replies using HTML formatting for high stability.
  */
 
 const https = require("https");
@@ -12,14 +12,32 @@ const {
 } = require("./projectHelpers");
 
 /**
+ * Escapes special HTML characters in dynamic user content
+ */
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
  * Send a message back to Telegram
  */
-function sendTelegramMessage(botToken, chatId, text) {
+function sendTelegramMessage(botToken, chatId, htmlText) {
   return new Promise((resolve, reject) => {
+    // Truncate if exceeds Telegram 4096 character limit
+    let safeText = htmlText;
+    if (safeText.length > 4000) {
+      safeText = safeText.substring(0, 3950) + "\n\n<i>[Mensaje truncado por longitud...]</i>";
+    }
+
     const payload = JSON.stringify({
       chat_id: chatId,
-      text: text,
-      parse_mode: "Markdown",
+      text: safeText,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
     });
 
     const options = {
@@ -35,10 +53,18 @@ function sendTelegramMessage(botToken, chatId, text) {
     const req = https.request(options, (res) => {
       let data = "";
       res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => resolve(data));
+      res.on("end", () => {
+        if (res.statusCode !== 200) {
+          console.error(`[Telegram API Error ${res.statusCode}]`, data);
+        }
+        resolve(data);
+      });
     });
 
-    req.on("error", (err) => reject(err));
+    req.on("error", (err) => {
+      console.error("[Telegram Request Error]", err);
+      reject(err);
+    });
     req.write(payload);
     req.end();
   });
@@ -72,19 +98,19 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
     // ─── COMMAND: /start or /ayuda ──────────────────────────────────────────
     if (text.startsWith("/start") || text.toLowerCase().includes("ayuda") || text === "/help") {
       const reply = 
-`🤖 *Nexus Tracker Bot*
+`🤖 <b>Nexus Tracker Bot</b>
 
 ¡Hola! Soy tu asistente de seguimiento de proyectos.
 
-📌 *Comandos disponibles:*
+📌 <b>Comandos disponibles:</b>
 
-📊 */resumen* - Ver KPIs del tablero ejecutivo
-📋 */proyectos* - Listar proyectos en cartera
-🔍 */buscar <nombre>* - Consultar estado de un proyecto
-✏️ */actualizar Proyecto | Fase | Porcentaje | Comentario*
+📊 <b>/resumen</b> - Ver KPIs del tablero ejecutivo
+📋 <b>/proyectos</b> - Listar proyectos activos <i>(filtros: todo, completados, riesgo, retrasados)</i>
+🔍 <b>/buscar &lt;nombre&gt;</b> - Consultar estado de un proyecto
+✏️ <b>/actualizar Proyecto | Fase | Porcentaje | Comentario</b>
 
-*Ejemplo de actualización:*
-\`/actualizar Algoritmo EECC | Desarrollo | 80 | Avanzando bien\``;
+<b>Ejemplo de actualización:</b>
+<code>/actualizar Algoritmo EECC | Desarrollo | 80 | Avanzando bien</code>`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -96,16 +122,16 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
       const summary = computeSummary(projects);
 
       const reply = 
-`📊 *Resumen Ejecutivo - Nexus Tracker*
+`📊 <b>Resumen Ejecutivo - Nexus Tracker</b>
 
-🔹 *Total Proyectos:* ${summary.total}
-✅ *Completados:* ${summary.completed}
-🟢 *A tiempo:* ${summary.onTrack}
-⚠️ *En riesgo:* ${summary.atRisk}
-🚨 *Retrasados:* ${summary.delayed}
-📈 *Cumplimiento SLA:* *${summary.sla}%*
+🔹 <b>Total Proyectos:</b> ${summary.total}
+✅ <b>Completados:</b> ${summary.completed}
+🟢 <b>A tiempo:</b> ${summary.onTrack}
+⚠️ <b>En riesgo:</b> ${summary.atRisk}
+🚨 <b>Retrasados:</b> ${summary.delayed}
+📈 <b>Cumplimiento SLA:</b> <b>${summary.sla}%</b>
 
-${summary.criticalProjects.length > 0 ? `🔥 *Proyectos críticos (${summary.criticalProjects.length}):*\n` + summary.criticalProjects.map(p => `• ${p}`).join("\n") : "✨ ¡No hay proyectos críticos en riesgo!"}`;
+${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos críticos (${summary.criticalProjects.length}):</b>\n` + summary.criticalProjects.map(p => `• ${escapeHtml(p)}`).join("\n") : "✨ ¡No hay proyectos críticos en riesgo!"}`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -113,25 +139,50 @@ ${summary.criticalProjects.length > 0 ? `🔥 *Proyectos críticos (${summary.cr
 
     // ─── COMMAND: /proyectos ────────────────────────────────────────────────
     if (text.startsWith("/proyectos") || text.toLowerCase() === "proyectos") {
-      const projects = await getProjects();
-      if (projects.length === 0) {
-        await sendTelegramMessage(botToken, chatId, "📭 No hay proyectos en la cartera.");
+      const allProjects = await getProjects();
+      const arg = text.replace("/proyectos", "").trim().toLowerCase();
+
+      let filtered = allProjects;
+      let title = "📋 Proyectos Activos";
+
+      if (arg === "todo" || arg === "todos") {
+        filtered = allProjects;
+        title = "📋 Todos los Proyectos";
+      } else if (arg === "completados" || arg === "completado") {
+        filtered = allProjects.filter((p) => p.health === "completed");
+        title = "✅ Proyectos Completados";
+      } else if (arg === "riesgo" || arg === "en riesgo") {
+        filtered = allProjects.filter((p) => p.health === "at_risk");
+        title = "⚠️ Proyectos en Riesgo";
+      } else if (arg === "retrasados" || arg === "retrasado") {
+        filtered = allProjects.filter((p) => p.health === "delayed");
+        title = "🚨 Proyectos Retrasados";
+      } else {
+        // Default: only active projects (exclude completed)
+        filtered = allProjects.filter((p) => p.health !== "completed");
+        title = "📋 Proyectos Activos";
+      }
+
+      if (filtered.length === 0) {
+        await sendTelegramMessage(botToken, chatId, `📭 No hay proyectos en la categoría "<b>${escapeHtml(arg || "activos")}</b>".`);
         return res.status(200).send("OK");
       }
 
-      let reply = `📋 *Cartera de Proyectos (${projects.length}):*\n\n`;
-      projects.slice(0, 15).forEach((p) => {
+      let reply = `<b>${title} (${filtered.length}):</b>\n\n`;
+      filtered.slice(0, 15).forEach((p) => {
         let badge = "🟢";
         if (p.health === "completed") badge = "✅";
         else if (p.health === "at_risk") badge = "⚠️";
         else if (p.health === "delayed") badge = "🚨";
 
-        reply += `${badge} *${p.name}*\n   ├ Progreso: *${p.overallProgress}%* (${p.healthLabel})\n   └ Cliente: ${p.client}\n\n`;
+        reply += `${badge} <b>${escapeHtml(p.name)}</b>\n   ├ Progreso: <b>${p.overallProgress}%</b> (${escapeHtml(p.healthLabel)})\n   └ Cliente: ${escapeHtml(p.client)}\n\n`;
       });
 
-      if (projects.length > 15) {
-        reply += `_...y ${projects.length - 15} proyectos más._`;
+      if (filtered.length > 15) {
+        reply += `<i>...y ${filtered.length - 15} proyectos más.</i>\n\n`;
       }
+
+      reply += `💡 <i>Tip: /proyectos todo | /proyectos completados | /proyectos riesgo | /proyectos retrasados</i>`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -141,7 +192,7 @@ ${summary.criticalProjects.length > 0 ? `🔥 *Proyectos críticos (${summary.cr
     if (text.startsWith("/buscar")) {
       const query = text.replace("/buscar", "").trim();
       if (!query) {
-        await sendTelegramMessage(botToken, chatId, "❓ Por favor escribe el nombre a buscar. Ej: \`/buscar Algoritmo\``);
+        await sendTelegramMessage(botToken, chatId, "❓ Por favor escribe el nombre a buscar. Ej: <code>/buscar Algoritmo</code>");
         return res.status(200).send("OK");
       }
 
@@ -149,25 +200,26 @@ ${summary.criticalProjects.length > 0 ? `🔥 *Proyectos críticos (${summary.cr
       const project = findProjectByName(projects, query);
 
       if (!project) {
-        await sendTelegramMessage(botToken, chatId, `❌ No se encontró ningún proyecto que coincida con "${query}".`);
+        await sendTelegramMessage(botToken, chatId, `❌ No se encontró ningún proyecto que coincida con "${escapeHtml(query)}".`);
         return res.status(200).send("OK");
       }
 
       let phasesText = project.phases.map(p => {
         let st = p.state === "Completado" ? "✅" : (p.state === "En curso" ? "🔄" : "⏳");
-        return `   • *${p.phase}:* ${p.progress}% ${st} ${p.comment ? `_("${p.comment}")_` : ""}`;
+        const cleanComment = p.comment ? ` <i>("${escapeHtml(p.comment)}")</i>` : "";
+        return `   • <b>${escapeHtml(p.phase)}:</b> ${p.progress}% ${st}${cleanComment}`;
       }).join("\n");
 
       const reply = 
-`📌 *Detalle de Proyecto:*
+`📌 <b>Detalle de Proyecto:</b>
 
-*Nombre:* ${project.name}
-*Cliente:* ${project.client}
-*Responsable:* ${project.responsible || "No asignado"}
-*Estado Global:* ${project.healthLabel} (${project.overallProgress}%)
-📅 *Fecha Entrega:* ${project.deliveryDate || "No definida"}
+<b>Nombre:</b> ${escapeHtml(project.name)}
+<b>Cliente:</b> ${escapeHtml(project.client)}
+<b>Responsable:</b> ${escapeHtml(project.responsible || "No asignado")}
+<b>Estado Global:</b> ${escapeHtml(project.healthLabel)} (${project.overallProgress}%)
+📅 <b>Fecha Entrega:</b> ${escapeHtml(project.deliveryDate || "No definida")}
 
-*Fases:*
+<b>Fases:</b>
 ${phasesText}`;
 
       await sendTelegramMessage(botToken, chatId, reply);
@@ -181,13 +233,13 @@ ${phasesText}`;
 
       if (parts.length < 3) {
         await sendTelegramMessage(botToken, chatId, 
-`⚠️ *Formato incorrecto.*
-Usa el separador \`|\` entre cada campo:
+`⚠️ <b>Formato incorrecto.</b>
+Usa el separador <code>|</code> entre cada campo:
 
-\`/actualizar Proyecto | Fase | Porcentaje | Comentario\`
+<code>/actualizar Proyecto | Fase | Porcentaje | Comentario</code>
 
-*Ejemplo:*
-\`/actualizar Algoritmo EECC | Desarrollo | 85 | Casi listo\``);
+<b>Ejemplo:</b>
+<code>/actualizar Algoritmo EECC | Desarrollo | 85 | Casi listo</code>`);
         return res.status(200).send("OK");
       }
 
@@ -203,13 +255,13 @@ Usa el separador \`|\` entre cada campo:
       const project = findProjectByName(projects, projectNameSearch);
 
       if (!project) {
-        await sendTelegramMessage(botToken, chatId, `❌ No se encontró el proyecto "${projectNameSearch}".`);
+        await sendTelegramMessage(botToken, chatId, `❌ No se encontró el proyecto "${escapeHtml(projectNameSearch)}".`);
         return res.status(200).send("OK");
       }
 
       const matchingPhase = project.phases.find(p => p.phase.toLowerCase().includes(phaseSearch.toLowerCase()));
       if (!matchingPhase) {
-        await sendTelegramMessage(botToken, chatId, `❌ No se encontró la fase "${phaseSearch}" en "${project.name}". Fases: ${project.phases.map(p => p.phase).join(", ")}`);
+        await sendTelegramMessage(botToken, chatId, `❌ No se encontró la fase "${escapeHtml(phaseSearch)}" en "${escapeHtml(project.name)}". Fases: ${project.phases.map(p => p.phase).join(", ")}`);
         return res.status(200).send("OK");
       }
 
@@ -226,13 +278,13 @@ Usa el separador \`|\` entre cada campo:
 
       await db.collection(collectionName).doc(matchingPhase.id).update(updates);
 
-      const reply = `✅ *¡Actualización exitosa!*\n\n📌 *Proyecto:* ${project.name}\n🔹 *Fase:* ${matchingPhase.phase}\n📊 *Nuevo Progreso:* ${newProgress}%\n📝 *Comentario:* ${commentStr || "Sin comentarios"}`;
+      const reply = `✅ <b>¡Actualización exitosa!</b>\n\n📌 <b>Proyecto:</b> ${escapeHtml(project.name)}\n🔹 <b>Fase:</b> ${escapeHtml(matchingPhase.phase)}\n📊 <b>Nuevo Progreso:</b> ${newProgress}%\n📝 <b>Comentario:</b> ${escapeHtml(commentStr || "Sin comentarios")}`;
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
     }
 
     // Default response for unhandled text
-    await sendTelegramMessage(botToken, chatId, "🤔 No entendí ese comando. Escribe */ayuda* para ver las opciones disponibles.");
+    await sendTelegramMessage(botToken, chatId, "🤔 No entendí ese comando. Escribe <b>/ayuda</b> para ver las opciones disponibles.");
     return res.status(200).send("OK");
 
   } catch (err) {
