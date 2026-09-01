@@ -183,7 +183,20 @@ app.patch("/projects/:name/phase/:phase", async (req, res) => {
     }
 
     if (comment !== undefined) {
-      updates.comment = String(comment).trim();
+      const cleanComment = String(comment).trim();
+      if (cleanComment.length > 0) {
+        const now = new Date();
+        const opts = { timeZone: "America/Santiago", day: "2-digit", month: "2-digit", year: "2-digit" };
+        const parts = new Intl.DateTimeFormat("es-CL", opts).formatToParts(now);
+        const day = parts.find(p => p.type === "day").value;
+        const month = parts.find(p => p.type === "month").value;
+        const year = parts.find(p => p.type === "year").value;
+        const todayStr = `${day}/${month}/${year}`;
+
+        const newEntry = `${todayStr}: ${cleanComment}`;
+        const existing = (matchingPhase.comment || "").trim();
+        updates.comment = existing.length > 0 ? `${existing}\n${newEntry}` : newEntry;
+      }
     }
 
     if (Object.keys(updates).length === 0) {

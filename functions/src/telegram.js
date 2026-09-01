@@ -542,6 +542,19 @@ ${phasesText}`;
 }
 
 /**
+ * Helper to get short date in DD/MM/YY format (Chile timezone)
+ */
+function getChileDateShort() {
+  const now = new Date();
+  const options = { timeZone: "America/Santiago", day: "2-digit", month: "2-digit", year: "2-digit" };
+  const parts = new Intl.DateTimeFormat("es-CL", options).formatToParts(now);
+  const day = parts.find(p => p.type === "day").value;
+  const month = parts.find(p => p.type === "month").value;
+  const year = parts.find(p => p.type === "year").value;
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Execute the phase update in Firestore and send final confirmation
  */
 async function executePhaseUpdate(db, collectionName, session, commentText, botToken, chatId) {
@@ -570,7 +583,19 @@ async function executePhaseUpdate(db, collectionName, session, commentText, botT
   else if (progress === 0) updates.state = "No iniciado";
   else updates.state = "En curso";
 
-  if (commentText) updates.comment = commentText;
+  // Append new comment with DD/MM/YY date prefix and newline
+  let addedEntry = "";
+  if (commentText && commentText.trim().length > 0) {
+    const todayStr = getChileDateShort();
+    addedEntry = `${todayStr}: ${commentText.trim()}`;
+    const existingComment = (matchingPhase.comment || "").trim();
+
+    if (existingComment.length > 0) {
+      updates.comment = `${existingComment}\n${addedEntry}`;
+    } else {
+      updates.comment = addedEntry;
+    }
+  }
 
   await db.collection(collectionName).doc(matchingPhase.id).update(updates);
 
@@ -580,7 +605,7 @@ async function executePhaseUpdate(db, collectionName, session, commentText, botT
 📌 <b>Proyecto:</b> ${escapeHtml(projectName)}
 🔹 <b>Fase:</b> ${escapeHtml(phaseName)}
 📊 <b>Nuevo Progreso:</b> ${progress}%
-📝 <b>Comentario:</b> ${escapeHtml(commentText || "Sin comentarios")}`;
+📝 <b>Nota Agregada:</b> ${escapeHtml(addedEntry || "Sin comentarios agregados")}`;
 
   await sendTelegramMessage(botToken, chatId, confirmation);
 }
