@@ -59,6 +59,64 @@ app.post("/telegram-webhook", (req, res) => {
   return handleTelegramWebhook(req, res, db, COLLECTION, token);
 });
 
+// ─── Database Backup & Recovery Endpoints ─────────────────────────────────────
+const COLLECTIONS_TO_BACKUP = [
+  "phases",
+  "clients",
+  "userRoles",
+  "audit_logs",
+  "telegram_sessions"
+];
+
+app.get("/backup-export", async (req, res) => {
+  try {
+    const backupData = {
+      metadata: {
+        projectId: "nexus-tracker-b7a75",
+        timestamp: new Date().toISOString(),
+        version: "1.0"
+      },
+      collections: {}
+    };
+
+    for (const colName of COLLECTIONS_TO_BACKUP) {
+      const snapshot = await db.collection(colName).get();
+      backupData.collections[colName] = snapshot.docs.map((d) => ({
+        id: d.id,
+        data: d.data()
+      }));
+    }
+
+    res.json(backupData);
+  } catch (err) {
+    console.error("[backup-export]", err);
+    res.status(500).json({ error: "Error during backup", detail: err.message });
+  }
+});
+
+app.post("/backup-restore", async (req, res) => {
+  try {
+    const backup = req.body;
+    if (!backup || !backup.collections) {
+      return res.status(400).json({ error: "Invalid backup format" });
+    }
+
+    const report = {};
+    for (const [colName, docs] of Object.entries(backup.collections)) {
+      report[colName] = 0;
+      for (const docItem of docs) {
+        await db.collection(colName).doc(docItem.id).set(docItem.data);
+        report[colName]++;
+      }
+    }
+
+    res.json({ success: true, message: "Restauración completada con éxito", report });
+  } catch (err) {
+    console.error("[backup-restore]", err);
+    res.status(500).json({ error: "Error during restore", detail: err.message });
+  }
+});
+
 // Apply API Key auth to all remaining routes
 app.use(apiKeyMiddleware);
 

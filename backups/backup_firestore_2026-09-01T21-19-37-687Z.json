@@ -1,0 +1,2548 @@
+{
+  "metadata": {
+    "projectId": "nexus-tracker-b7a75",
+    "timestamp": "2026-09-01T21:19:33.920Z",
+    "version": "1.0"
+  },
+  "collections": {
+    "phases": [
+      {
+        "id": "algoritmo-eecc-desarrollo-1777483824870",
+        "data": {
+          "id": "algoritmo-eecc-desarrollo-1777483824870",
+          "projectId": "proj-1777483824870",
+          "project": "Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "startDate": "30/04/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "comment": "Pausa por otras actividades. Se comienza el desarrollo.\n30/04/26: Inicio desarrollo (carga de fuentes a Fabric)\n11/05/26: Carga de fuentes en un 40%\n15/05/26: Se expande el desarrollo por 1 semana\n15/05/26: Comenzando con el desarrollo del algoritmo en Fabric\n25/05/26: Fuentes cargadas\n04/05/26: Fuentes modiifcadas con nueva estructura\n05/05/26: Primeros resultados\n16/06/26: Reporte reusltado de proceso automatico con bases estaticas casi listo, solo falta cuadrar\n18/06/26: Reporte resultado con bases estaticas enviado a para su revisión.\n23/06/26: Reporte resultado con bases dinamicas enviado para su revisión y confirmación de calidad de datos.",
+          "endDate": "19/06/2026",
+          "lastModified": 1782229578714
+        }
+      },
+      {
+        "id": "algoritmo-eecc-entrega-1777483824870",
+        "data": {
+          "id": "algoritmo-eecc-entrega-1777483824870",
+          "projectId": "proj-1777483824870",
+          "project": "Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "24/06/2026",
+          "startDate": "22/06/2026",
+          "comment": "23/06/26: Enviado correo de finalización de proyecto.",
+          "progress": 100,
+          "lastModified": 1783952483437,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "algoritmo-eecc-levantamiento-1777483824870",
+        "data": {
+          "id": "algoritmo-eecc-levantamiento-1777483824870",
+          "projectId": "proj-1777483824870",
+          "project": "Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "endDate": "22/04/2026",
+          "startDate": "06/04/2026",
+          "responsible": "Felipe Toro",
+          "comment": "Responsable: Dyny \n07-04-2026: Reunión de levantamiento - Realizada\n15-04-2026: a la espera de reunión de conocimiento.\n22-04-2026: Reunión efectuada.",
+          "progress": 100,
+          "lastModified": 1782229694921,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "algoritmo-eecc-testing-qa-1777483824870",
+        "data": {
+          "id": "algoritmo-eecc-testing-qa-1777483824870",
+          "projectId": "proj-1777483824870",
+          "project": "Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "22/06/2026",
+          "startDate": "15/06/2026",
+          "comment": "Pruebas realizadas:\nCabe destacar que esta cuadratura fue realizada utilizando datos estáticos (archivos Excel) para establecer un punto de comparación inicial (línea base) y asegurar la precisión de las fórmulas de negocio antes del desarrollo en producción:\nTotal de Registros en la Data de Comparación: 6.655 registros.\nTotal de Registros en el Prototipo Final (v1.0.3): 10.519 registros (universo óptimo priorizado tras aplicar las reglas de negocio).\nCoincidencia Exacta (Intersección): 6.655 de 6.655 registros (100,00% de coincidencia).\nRegistros Faltantes de la Muestra: 0 registros.",
+          "progress": 100,
+          "lastModified": 1782229688735,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "arquitectura-de-medall-n---algoritmo-eecc-desarrollo-1782318838581",
+        "data": {
+          "id": "arquitectura-de-medall-n---algoritmo-eecc-desarrollo-1782318838581",
+          "projectId": "proj-1782318838581",
+          "project": "Arquitectura de medallón - Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "",
+          "lastModified": 1787331773718,
+          "startDate": ""
+        }
+      },
+      {
+        "id": "arquitectura-de-medall-n---algoritmo-eecc-entrega-1782318838581",
+        "data": {
+          "id": "arquitectura-de-medall-n---algoritmo-eecc-entrega-1782318838581",
+          "projectId": "proj-1782318838581",
+          "project": "Arquitectura de medallón - Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "30/09/2026",
+          "lastModified": 1787331756706,
+          "startDate": "29/09/2026"
+        }
+      },
+      {
+        "id": "arquitectura-de-medall-n---algoritmo-eecc-levantamiento-1782318838581",
+        "data": {
+          "id": "arquitectura-de-medall-n---algoritmo-eecc-levantamiento-1782318838581",
+          "projectId": "proj-1782318838581",
+          "project": "Arquitectura de medallón - Algoritmo EECC",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "30/06/2026",
+          "startDate": "24/06/2026",
+          "state": "En curso",
+          "progress": 67,
+          "comment": "24/06/2026: Reunion de levantamiento con Damian, introduccion a los lineamientos\n29/06/2026: Envio de tablas para cargar en Lakehouse de fabric\n01/07/2026: A la espera de respuesta\n06/07/2026: Mapeo de tablas para todos los procesos\n13/07/2026: A la espera de respuesta de TI",
+          "lastModified": 1783952435946
+        }
+      },
+      {
+        "id": "automatizaci-n-reporte-gesti-n---benchmark-desarrollo-1777484747206",
+        "data": {
+          "id": "automatizaci-n-reporte-gesti-n---benchmark-desarrollo-1777484747206",
+          "projectId": "proj-1777484747206",
+          "project": "Automatización Reporte Gestión / Benchmark",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "endDate": "13/07/2026",
+          "startDate": "01/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346706096
+        }
+      },
+      {
+        "id": "automatizaci-n-reporte-gesti-n---benchmark-entrega-1777484747206",
+        "data": {
+          "id": "automatizaci-n-reporte-gesti-n---benchmark-entrega-1777484747206",
+          "projectId": "proj-1777484747206",
+          "project": "Automatización Reporte Gestión / Benchmark",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "endDate": "22/07/2026",
+          "startDate": "20/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346706096
+        }
+      },
+      {
+        "id": "automatizaci-n-reporte-gesti-n---benchmark-levantamiento-1777484747206",
+        "data": {
+          "id": "automatizaci-n-reporte-gesti-n---benchmark-levantamiento-1777484747206",
+          "projectId": "proj-1777484747206",
+          "project": "Automatización Reporte Gestión / Benchmark",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "endDate": "01/07/2026",
+          "startDate": "29/06/2026",
+          "isArchived": true,
+          "lastModified": 1783346706096
+        }
+      },
+      {
+        "id": "automatizaci-n-reporte-gesti-n---benchmark-testing-qa-1777484747206",
+        "data": {
+          "id": "automatizaci-n-reporte-gesti-n---benchmark-testing-qa-1777484747206",
+          "projectId": "proj-1777484747206",
+          "project": "Automatización Reporte Gestión / Benchmark",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "endDate": "22/07/2026",
+          "startDate": "20/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346706096
+        }
+      },
+      {
+        "id": "automatizacion-experis-desarrollo-1776082530885",
+        "data": {
+          "id": "automatizacion-experis-desarrollo-1776082530885",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "project": "Automatizacion Experis(HC- Marcaje-Nomina)",
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "endDate": "05/03/2026",
+          "startDate": "12/01/2026",
+          "client": "Experis",
+          "lastModified": 1777325737704
+        }
+      },
+      {
+        "id": "automatizacion-experis-entrega-1776082530885",
+        "data": {
+          "id": "automatizacion-experis-entrega-1776082530885",
+          "phase": "Entrega",
+          "comment": "",
+          "isArchived": false,
+          "project": "Automatizacion Experis(HC- Marcaje-Nomina)",
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "endDate": "13/03/2026",
+          "startDate": "13/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325737704
+        }
+      },
+      {
+        "id": "automatizacion-experis-levantamiento-1776082530885",
+        "data": {
+          "id": "automatizacion-experis-levantamiento-1776082530885",
+          "phase": "Levantamiento",
+          "comment": "",
+          "isArchived": false,
+          "project": "Automatizacion Experis(HC- Marcaje-Nomina)",
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "endDate": "10/04/2026",
+          "startDate": "02/01/2026",
+          "client": "Experis",
+          "lastModified": 1777325737704
+        }
+      },
+      {
+        "id": "automatizacion-experis-testing-qa-1776082530885",
+        "data": {
+          "id": "automatizacion-experis-testing-qa-1776082530885",
+          "phase": "Testing/QA",
+          "comment": "",
+          "isArchived": false,
+          "project": "Automatizacion Experis(HC- Marcaje-Nomina)",
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "endDate": "13/03/2026",
+          "startDate": "06/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325737704
+        }
+      },
+      {
+        "id": "automatizacion-huawei-desarrollo-1776082846348",
+        "data": {
+          "id": "automatizacion-huawei-desarrollo-1776082846348",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "project": "Automatizacion de Correos Huawei",
+          "endDate": "05/03/2026",
+          "startDate": "02/02/2026",
+          "client": "Experis",
+          "lastModified": 1777325734684
+        }
+      },
+      {
+        "id": "automatizacion-huawei-entrega-1776082846348",
+        "data": {
+          "id": "automatizacion-huawei-entrega-1776082846348",
+          "phase": "Entrega",
+          "comment": "",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "project": "Automatizacion de Correos Huawei",
+          "endDate": "16/03/2026",
+          "startDate": "11/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325734685
+        }
+      },
+      {
+        "id": "automatizacion-huawei-levantamiento-1776082846348",
+        "data": {
+          "id": "automatizacion-huawei-levantamiento-1776082846348",
+          "phase": "Levantamiento",
+          "comment": "",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "project": "Automatizacion de Correos Huawei",
+          "endDate": "09/01/2026",
+          "startDate": "05/01/2026",
+          "client": "Experis",
+          "lastModified": 1777325734685
+        }
+      },
+      {
+        "id": "automatizacion-huawei-testing-qa-1776082846348",
+        "data": {
+          "id": "automatizacion-huawei-testing-qa-1776082846348",
+          "phase": "Testing/QA",
+          "comment": "",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Vicente Gonzalez",
+          "project": "Automatizacion de Correos Huawei",
+          "endDate": "10/04/2026",
+          "startDate": "06/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325734685
+        }
+      },
+      {
+        "id": "brochure-desarrollo-1775763698655",
+        "data": {
+          "id": "brochure-desarrollo-1775763698655",
+          "project": "Brochure",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "state": "Finalizado",
+          "progress": 100,
+          "endDate": "27/02/2026",
+          "startDate": "16/02/2026",
+          "responsible": "Isabel Sandoval",
+          "client": "Mutual Reportes",
+          "lastModified": 1777382719880
+        }
+      },
+      {
+        "id": "brochure-entrega-1775763698655",
+        "data": {
+          "id": "brochure-entrega-1775763698655",
+          "project": "Brochure",
+          "phase": "Entrega",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "27/02/2026",
+          "startDate": "27/02/2026",
+          "comment": "Publicado: Si",
+          "responsible": "Isabel Sandoval",
+          "client": "Mutual Reportes",
+          "lastModified": 1777382719882
+        }
+      },
+      {
+        "id": "carga-asistencial-desarrollo-1775746813607",
+        "data": {
+          "id": "carga-asistencial-desarrollo-1775746813607",
+          "project": "Carga Asistencial",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "startDate": "13/05/2026",
+          "progress": 20,
+          "state": "En curso",
+          "endDate": "05/06/2026",
+          "comment": "Original: https://app.powerbi.com/groups/d17ff185-e714-4ae3-92f5-6f4b99a3285e/reports/9f67cca4-17d3-4974-887e-9776964e452f/ReportSection5c8cec13b1e0cd2e3ac7?experience=power-bi\n\nResponsable: Luis Rojas\n\n20/05/26: Pausa por desarrollo de panel PBI Horizonte.\n01/06/26: Se retoma desarrollo del panel.",
+          "lastModified": 1780325452729
+        }
+      },
+      {
+        "id": "carga-asistencial-entrega-1775746813607",
+        "data": {
+          "id": "carga-asistencial-entrega-1775746813607",
+          "project": "Carga Asistencial",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "endDate": "30/09/2026",
+          "lastModified": 1788201602344,
+          "startDate": "29/09/2026"
+        }
+      },
+      {
+        "id": "carga-subsidios-aportes-desarrollo-1777314713781",
+        "data": {
+          "id": "carga-subsidios-aportes-desarrollo-1777314713781",
+          "project": "Carga Subsidios/Aportes",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "endDate": "27/03/2026",
+          "progress": 100,
+          "comment": "Construcción del pipeline Fabric\nAutomatización de la consolidación y cruce de variables\nSegmentación de tablas para carga en Pitao\n19/03 reunión Dyny validación del proceso y mejoras",
+          "lastModified": 1777314907115,
+          "state": "Finalizado",
+          "startDate": "16/03/2026"
+        }
+      },
+      {
+        "id": "carga-subsidios-aportes-entrega-1777314713781",
+        "data": {
+          "id": "carga-subsidios-aportes-entrega-1777314713781",
+          "project": "Carga Subsidios/Aportes",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "endDate": "20/04/2026",
+          "progress": 100,
+          "comment": "09/04 carga de subsiddios/aportes para el mes de marzo\n20/04 entrega de documentación y sesión de traspaso a Dyny",
+          "state": "Finalizado",
+          "lastModified": 1777382979800,
+          "startDate": "09/04/2026"
+        }
+      },
+      {
+        "id": "carga-subsidios-aportes-levantamiento-1777314713781",
+        "data": {
+          "id": "carga-subsidios-aportes-levantamiento-1777314713781",
+          "project": "Carga Subsidios/Aportes",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "endDate": "16/03/2026",
+          "progress": 100,
+          "comment": "Responsable Dyny\n11/03 reunión Dyny \nComprensión del proceso de carga del informe de gestión a subsidios/aportes",
+          "lastModified": 1777314828266,
+          "state": "Finalizado",
+          "startDate": "11/03/2026"
+        }
+      },
+      {
+        "id": "carga-subsidios-aportes-testing-qa-1777314713781",
+        "data": {
+          "id": "carga-subsidios-aportes-testing-qa-1777314713781",
+          "project": "Carga Subsidios/Aportes",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "endDate": "30/03/2026",
+          "progress": 100,
+          "comment": "Ejecución de pruebas con el periodo de febrero utilizando tablas de prueba\nProcesos ejecutados con éxito",
+          "lastModified": 1777314985821,
+          "state": "Finalizado",
+          "startDate": "24/03/2026"
+        }
+      },
+      {
+        "id": "control-movilizacion---v3-desarrollo-1775764768989",
+        "data": {
+          "id": "control-movilizacion---v3-desarrollo-1775764768989",
+          "project": "Control Movilizacion - V3",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "endDate": "13/03/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "02/03/2026",
+          "client": "Mutual Reportes",
+          "responsible": "Isabel Sandoval",
+          "lastModified": 1777386664075
+        }
+      },
+      {
+        "id": "control-movilizacion---v3-entrega-1775764768989",
+        "data": {
+          "id": "control-movilizacion---v3-entrega-1775764768989",
+          "project": "Control Movilizacion - V3",
+          "phase": "Entrega",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "13/04/2026",
+          "endDate": "27/04/2026",
+          "client": "Mutual Reportes",
+          "responsible": "Isabel Sandoval",
+          "comment": "22/04 reunión de entrega\nPublicado: Si ",
+          "lastModified": 1780606891502
+        }
+      },
+      {
+        "id": "control-presupuestario-sap-fm-desarrollo-1787258585969",
+        "data": {
+          "id": "control-presupuestario-sap-fm-desarrollo-1787258585969",
+          "projectId": "proj-1787258585969",
+          "project": "Control Presupuestario SAP FM",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "endDate": "20/08/2026",
+          "state": "En curso",
+          "startDate": "13/07/2026",
+          "responsible": "Bastián Rojas",
+          "comment": "Semana 3: Primera versión del prototipo\n- Desarrollo de v1: propuesta maqueta\n- Documentación del avance\nSemana 4: Segunda versión y evolución\n- Desarrollo de la v2\n- Inicio de la v3 al cierre de la semana\nSemana 5:  Integración con datos reales\n- Cierre de la v3\n- Integración de datos de SAP FM\n- Reportería con información real\nSemana 6:\n- Integración de dimensiones Ceco y Cuenta desde texto plano\n- Construcción de hoja Seguimiento de pedidos\n- Implementación de visual semáfoto de gerencias\n- Extracción de datos provenientes de SAP FM para construcción de tablas de hechos (Ppto, solicitado, comprometido y facturado)\nSemana 7:\n- Automatización de dimensiones Ceco y Cuenta (Proveniente de tablas cargadas en Fabric y forces para definición actual)\n- Nueva gerencia Transformación Digital integrada\n- Ajustes visuales en reportería\n- Cuadratura y detección de estados de trazabilidad\n\n28-08-2026: se ajustó jerarquia de visualizacion en el detalle por Cuenta - Ceco",
+          "progress": 70,
+          "lastModified": 1787936749978
+        }
+      },
+      {
+        "id": "control-presupuestario-sap-fm-entrega-1787258585969",
+        "data": {
+          "id": "control-presupuestario-sap-fm-entrega-1787258585969",
+          "projectId": "proj-1787258585969",
+          "project": "Control Presupuestario SAP FM",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Bastián Rojas",
+          "lastModified": 1787261428822
+        }
+      },
+      {
+        "id": "control-presupuestario-sap-fm-levantamiento-1787258585969",
+        "data": {
+          "id": "control-presupuestario-sap-fm-levantamiento-1787258585969",
+          "projectId": "proj-1787258585969",
+          "project": "Control Presupuestario SAP FM",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "endDate": "10/07/2026",
+          "progress": 100,
+          "comment": "Entendimiento del negocio\n- Capacitación en SAP FM, módulos utilizados Budget y Budcon.\n- Exploración de entorno MS Fabric Mutual\nDefinición de la solución\n- Levantamiento\n- Objetivos y requerimientos\n- Solución a implementar",
+          "state": "Finalizado",
+          "startDate": "29/06/2026",
+          "responsible": "Bastián Rojas",
+          "lastModified": 1787261428823
+        }
+      },
+      {
+        "id": "control-presupuestario-sap-fm-testing-qa-1787258585969",
+        "data": {
+          "id": "control-presupuestario-sap-fm-testing-qa-1787258585969",
+          "projectId": "proj-1787258585969",
+          "project": "Control Presupuestario SAP FM",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "endDate": "28/08/2026",
+          "state": "Finalizado",
+          "startDate": "10/08/2026",
+          "responsible": "Bastián Rojas",
+          "progress": 75,
+          "comment": "19-08-2026\n- Se ajustó el reporte y el indicador de Presupuesto quedó cuadrado con el archivo de referencia, excluyendo la cuenta 510805 correspondiente a remuneraciones.\n- El indicador Facturado sólo considera movimientos entre el 1 y el 20 de julio; para validar el resto de las cuentas se requiere el detalle de solicitudes de budget.xlsx.\n- Los indicadores Solicitado y Comprometido corresponden a la extracción del 21 de julio, por lo que pueden diferir del archivo de referencia debido a la fecha de actualización.",
+          "lastModified": 1787936717457
+        }
+      },
+      {
+        "id": "cumplimiento-de-metas-desarrollo-1775764076107",
+        "data": {
+          "id": "cumplimiento-de-metas-desarrollo-1775764076107",
+          "project": "Cumplimiento de metas",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "endDate": "02/03/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "17/02/2026",
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "lastModified": 1777486549021
+        }
+      },
+      {
+        "id": "cumplimiento-de-metas-entrega-1775764076107",
+        "data": {
+          "id": "cumplimiento-de-metas-entrega-1775764076107",
+          "project": "Cumplimiento de metas",
+          "phase": "Entrega",
+          "isArchived": false,
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "endDate": "06/05/2026",
+          "comment": "En proceso de paso a producción",
+          "startDate": "30/04/2026",
+          "progress": 100,
+          "lastModified": 1778174415815,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "dashboard-huawei-desarrollo-1776082959032",
+        "data": {
+          "id": "dashboard-huawei-desarrollo-1776082959032",
+          "project": "Dashboard Huawei",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Vicente Gonzalez",
+          "state": "Finalizado",
+          "progress": 100,
+          "endDate": "08/04/2026",
+          "startDate": "20/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325741091
+        }
+      },
+      {
+        "id": "dashboard-huawei-entrega-1776082959032",
+        "data": {
+          "id": "dashboard-huawei-entrega-1776082959032",
+          "project": "Dashboard Huawei",
+          "phase": "Entrega",
+          "endDate": "",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "13/04/2026",
+          "client": "Experis",
+          "lastModified": 1777325741091
+        }
+      },
+      {
+        "id": "dashboard-huawei-levantamiento-1776082959032",
+        "data": {
+          "id": "dashboard-huawei-levantamiento-1776082959032",
+          "project": "Dashboard Huawei",
+          "phase": "Levantamiento",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "20/03/2026",
+          "startDate": "16/03/2026",
+          "client": "Experis",
+          "lastModified": 1777325741092
+        }
+      },
+      {
+        "id": "dashboard-huawei-testing-qa-1776082959032",
+        "data": {
+          "id": "dashboard-huawei-testing-qa-1776082959032",
+          "project": "Dashboard Huawei",
+          "phase": "Testing/QA",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "09/04/2026",
+          "endDate": "10/04/2026",
+          "client": "Experis",
+          "lastModified": 1777325741092
+        }
+      },
+      {
+        "id": "estado-pago-desarrollo-1787334640784",
+        "data": {
+          "id": "estado-pago-desarrollo-1787334640784",
+          "projectId": "proj-1787334640784",
+          "project": "Estado Pago",
+          "client": "Mutual CET",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "progress": 10,
+          "state": "En curso",
+          "startDate": "19/08/2026",
+          "comment": "21/08 reunión con Tabita cuadrar mes de julio\n\n",
+          "endDate": "25/09/2026",
+          "lastModified": 1788209369888
+        }
+      },
+      {
+        "id": "estado-pago-entrega-1787334640784",
+        "data": {
+          "id": "estado-pago-entrega-1787334640784",
+          "projectId": "proj-1787334640784",
+          "project": "Estado Pago",
+          "client": "Mutual CET",
+          "phase": "Entrega",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "lastModified": 1787334870378
+        }
+      },
+      {
+        "id": "estado-pago-levantamiento-1787334640784",
+        "data": {
+          "id": "estado-pago-levantamiento-1787334640784",
+          "projectId": "proj-1787334640784",
+          "project": "Estado Pago",
+          "client": "Mutual CET",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "state": "En curso",
+          "progress": 50,
+          "comment": "03/07 inicio del proyecto \n03/08 levantamiento con Tabita\n12/08 propuesta de panel\n",
+          "startDate": "03/08/2026",
+          "endDate": "04/09/2026",
+          "lastModified": 1788209398954
+        }
+      },
+      {
+        "id": "estado-pago-testing-qa-1787334640784",
+        "data": {
+          "id": "estado-pago-testing-qa-1787334640784",
+          "projectId": "proj-1787334640784",
+          "project": "Estado Pago",
+          "client": "Mutual CET",
+          "phase": "Testing/QA",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "lastModified": 1787334870379
+        }
+      },
+      {
+        "id": "gesti-n-bbdd--me2l-pad--desarrollo-1777484166998",
+        "data": {
+          "id": "gesti-n-bbdd--me2l-pad--desarrollo-1777484166998",
+          "projectId": "proj-1777484166998",
+          "project": "Gestión BBDD (ME2L PAD)",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "17/07/2026",
+          "startDate": "06/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346712975
+        }
+      },
+      {
+        "id": "gesti-n-bbdd--me2l-pad--entrega-1777484166998",
+        "data": {
+          "id": "gesti-n-bbdd--me2l-pad--entrega-1777484166998",
+          "projectId": "proj-1777484166998",
+          "project": "Gestión BBDD (ME2L PAD)",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "24/07/2026",
+          "startDate": "22/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346712975
+        }
+      },
+      {
+        "id": "gesti-n-bbdd--me2l-pad--levantamiento-1777484166998",
+        "data": {
+          "id": "gesti-n-bbdd--me2l-pad--levantamiento-1777484166998",
+          "projectId": "proj-1777484166998",
+          "project": "Gestión BBDD (ME2L PAD)",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "03/07/2026",
+          "startDate": "29/06/2026",
+          "isArchived": true,
+          "lastModified": 1783346712975
+        }
+      },
+      {
+        "id": "gesti-n-bbdd--me2l-pad--testing-qa-1777484166998",
+        "data": {
+          "id": "gesti-n-bbdd--me2l-pad--testing-qa-1777484166998",
+          "projectId": "proj-1777484166998",
+          "project": "Gestión BBDD (ME2L PAD)",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "22/07/2026",
+          "startDate": "20/07/2026",
+          "isArchived": true,
+          "lastModified": 1783346712975
+        }
+      },
+      {
+        "id": "indicadores-de-riesgo---arquitectura-medall-n-desarrollo-1784307847774",
+        "data": {
+          "phase": "Desarrollo",
+          "project": "Indicadores de riesgo - Arquitectura medallón",
+          "client": "Mutual",
+          "projectId": "proj-1784307847774",
+          "id": "indicadores-de-riesgo---arquitectura-medall-n-desarrollo-1784307847774",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "progress": 14,
+          "state": "No iniciado",
+          "endDate": "",
+          "startDate": "",
+          "comment": "Creación de procesos en plata con las tablas disponibles\n",
+          "lastModified": 1787936732735
+        }
+      },
+      {
+        "id": "indicadores-de-riesgo---arquitectura-medall-n-entrega-1784307847774",
+        "data": {
+          "endDate": "",
+          "id": "indicadores-de-riesgo---arquitectura-medall-n-entrega-1784307847774",
+          "projectId": "proj-1784307847774",
+          "isArchived": false,
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "startDate": "",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "project": "Indicadores de riesgo - Arquitectura medallón",
+          "responsible": "Javiera Contador",
+          "lastModified": 1784307879743
+        }
+      },
+      {
+        "id": "indicadores-de-riesgo---arquitectura-medall-n-levantamiento-1784307847774",
+        "data": {
+          "isArchived": false,
+          "projectId": "proj-1784307847774",
+          "id": "indicadores-de-riesgo---arquitectura-medall-n-levantamiento-1784307847774",
+          "project": "Indicadores de riesgo - Arquitectura medallón",
+          "phase": "Levantamiento",
+          "client": "Mutual",
+          "responsible": "Javiera Contador",
+          "progress": 49,
+          "comment": "Reuniones con Felipe para entender el proceso\n09/07 Solicitud de tablas faltantes",
+          "state": "No iniciado",
+          "endDate": "",
+          "lastModified": 1785251308888,
+          "startDate": ""
+        }
+      },
+      {
+        "id": "indicadores-de-riesgo---arquitectura-medall-n-testing-qa-1784307847774",
+        "data": {
+          "projectId": "proj-1784307847774",
+          "id": "indicadores-de-riesgo---arquitectura-medall-n-testing-qa-1784307847774",
+          "isArchived": false,
+          "endDate": "",
+          "phase": "Testing/QA",
+          "project": "Indicadores de riesgo - Arquitectura medallón",
+          "startDate": "",
+          "client": "Mutual",
+          "comment": "",
+          "progress": 0,
+          "state": "No iniciado",
+          "responsible": "Javiera Contador",
+          "lastModified": 1784307879743
+        }
+      },
+      {
+        "id": "levantamiento-entrega-1784650203132",
+        "data": {
+          "client": "Mutual",
+          "projectId": "proj-1784650203132",
+          "id": "levantamiento-entrega-1784650203132",
+          "isArchived": false,
+          "phase": "Entrega",
+          "project": "Levantamiento datos sensibles",
+          "responsible": "Javiera Contador",
+          "startDate": "30/07/2026",
+          "comment": "Envio de matriz de paneles y el informe de levantamiento",
+          "endDate": "31/07/2026",
+          "progress": 100,
+          "lastModified": 1785512522359,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "levantamiento-levantamiento-1784650203132",
+        "data": {
+          "client": "Mutual",
+          "projectId": "proj-1784650203132",
+          "id": "levantamiento-levantamiento-1784650203132",
+          "isArchived": false,
+          "phase": "Levantamiento",
+          "project": "Levantamiento datos sensibles",
+          "responsible": "Javiera Contador",
+          "startDate": "20/07/2026",
+          "endDate": "30/07/2026",
+          "comment": "20/07 reu con Dyny\n27/07 presentación de avances y aclaración de dudas\nidentificar los paneles que poseen datos personales y sensibles de los trabajadores y pacientes.\nCompletar la matriz de paneles y realización de informe para levantamiento",
+          "progress": 100,
+          "lastModified": 1785512512727,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "ley-karin-desarrollo-1775764144172",
+        "data": {
+          "id": "ley-karin-desarrollo-1775764144172",
+          "project": "Ley Karin",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "state": "Finalizado",
+          "startDate": "18/02/2026",
+          "comment": "Nueva hoja \"Casos a Revisión\"",
+          "responsible": "Felipe Toro",
+          "progress": 100,
+          "endDate": "04/03/2026",
+          "client": "Mutual Reportes",
+          "lastModified": 1777382930838
+        }
+      },
+      {
+        "id": "ley-karin-entrega-1775764144172",
+        "data": {
+          "id": "ley-karin-entrega-1775764144172",
+          "project": "Ley Karin",
+          "phase": "Entrega",
+          "isArchived": false,
+          "state": "Finalizado",
+          "responsible": "Felipe Toro",
+          "progress": 100,
+          "comment": "Reporte listo, datos verificados.\nA la espera de reunión con cliente para migración.\n22/04/2026: Entregado con compromiso de ser levantado por encargado del reporte previo a unos ajustes de seguridad.",
+          "endDate": "22/04/2026",
+          "client": "Mutual Reportes",
+          "lastModified": 1777382949524,
+          "startDate": "15/04/2026"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-2-desarrollo-1774883407042",
+        "data": {
+          "id": "nuevo-proyecto-2-desarrollo-1774883407042",
+          "phase": "Desarrollo",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "project": "Proyecciones Masa Carga a BBDD",
+          "client": "Mutual",
+          "isArchived": true,
+          "lastModified": 1777562057470
+        }
+      },
+      {
+        "id": "nuevo-proyecto-2-entrega-1774883407042",
+        "data": {
+          "id": "nuevo-proyecto-2-entrega-1774883407042",
+          "phase": "Entrega",
+          "startDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "project": "Proyecciones Masa Carga a BBDD",
+          "endDate": "21/05/2026",
+          "client": "Mutual",
+          "isArchived": true,
+          "lastModified": 1777562057471
+        }
+      },
+      {
+        "id": "nuevo-proyecto-2-levantamiento-1774883407042",
+        "data": {
+          "id": "nuevo-proyecto-2-levantamiento-1774883407042",
+          "phase": "Levantamiento",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "project": "Proyecciones Masa Carga a BBDD",
+          "client": "Mutual",
+          "startDate": "04/05/2026",
+          "isArchived": true,
+          "lastModified": 1777562057471
+        }
+      },
+      {
+        "id": "nuevo-proyecto-2-testing-qa-1774883407042",
+        "data": {
+          "id": "nuevo-proyecto-2-testing-qa-1774883407042",
+          "phase": "Testing/QA",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "project": "Proyecciones Masa Carga a BBDD",
+          "client": "Mutual",
+          "isArchived": true,
+          "lastModified": 1777562057471
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1773759164605",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1773759164605",
+          "phase": "Desarrollo",
+          "project": "Proceso ACRM",
+          "responsible": "Felipe Toro",
+          "startDate": "23/02/2026",
+          "client": "Mutual",
+          "comment": "17-03-2026: Replicando proceso local en Fabric.\n23-03-2026: Se continua trabajando en la migración a Fabric.\nSin inconvenientes hasta ahora.",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "10/04/2026",
+          "lastModified": 1777580960032
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1773761977089",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1773761977089",
+          "phase": "Desarrollo",
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "startDate": "22/12/2025",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "16/01/2026",
+          "project": "Circular 2961 parte II",
+          "client": "Mutual",
+          "isArchived": false,
+          "lastModified": 1777483206001
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1773762487872",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1773762487872",
+          "phase": "Desarrollo",
+          "comment": "",
+          "project": "Reporte de transparencia",
+          "responsible": "Felipe Toro",
+          "endDate": "13/02/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "02/02/2026",
+          "client": "Mutual",
+          "lastModified": 1777382981295
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1774884394544",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1774884394544",
+          "phase": "Desarrollo",
+          "comment": "",
+          "responsible": "Isabel Sandoval",
+          "progress": 100,
+          "state": "Finalizado",
+          "project": "Indicadores de Riesgo",
+          "client": "Mutual",
+          "startDate": "21/01/2026",
+          "endDate": "04/02/2026",
+          "lastModified": 1777315109519
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1775569054936",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1775569054936",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "project": "Proyecto ESVAL",
+          "comment": "",
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "28/11/2025",
+          "startDate": "23/09/2025",
+          "client": "Experis",
+          "lastModified": 1777325743677
+        }
+      },
+      {
+        "id": "nuevo-proyecto-desarrollo-1779225475352",
+        "data": {
+          "id": "nuevo-proyecto-desarrollo-1779225475352",
+          "projectId": "proj-1779225475352",
+          "client": "Mutual Reportes",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "29/05/2026",
+          "startDate": "19/05/2026",
+          "project": "PBI_Horizonte - PROD",
+          "progress": 100,
+          "comment": "Se aplicaron los cambios visuales necesarios",
+          "lastModified": 1780322592132,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1773759164605",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1773759164605",
+          "phase": "Entrega",
+          "project": "Proceso ACRM",
+          "responsible": "Felipe Toro",
+          "client": "Mutual",
+          "endDate": "30/04/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "13/04/2026",
+          "comment": "05/03/2026: Primer intento de entrega.\n13/03/2026: Entrega presento inconvenientes.\n30/03/2026: Agendada entrega proceso Fabric.\n31/03/2026: Se entrega con observaciones que serán implementadas.\n09/04/2026: a la espera de fecha para realizar entrega final.\n22/04/2026: Primera entrega.\n28/04/2026: Entrega con modificaciones solicitadas en reunión anterior.\n30/04/2026: Entrega Final.\n\nActualizaciones posteriores:\nLuego de la entrega se han realizado los siguientes cambios:\nAgregación de nuevo campo a la interpretacion \"Gestion_preventiva\" solo para \"ACEPTADOS\"\nMensaje de alerta cuando se ejecuta el proceso y no existe nuevas notificaciones (PDFs)\nEjecución de PA de actualización de RECA al inicio y al final del proceso",
+          "lastModified": 1779116624076
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1773761977089",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1773761977089",
+          "phase": "Entrega",
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "endDate": "23/01/2026",
+          "startDate": "19/01/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "project": "Circular 2961 parte II",
+          "client": "Mutual",
+          "isArchived": false,
+          "lastModified": 1777483206001
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1773762487872",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1773762487872",
+          "phase": "Entrega",
+          "comment": "",
+          "project": "Reporte de transparencia",
+          "responsible": "Felipe Toro",
+          "endDate": "13/02/2026",
+          "startDate": "11/02/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "client": "Mutual",
+          "lastModified": 1777382981295
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1774884394544",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1774884394544",
+          "phase": "Entrega",
+          "comment": "",
+          "responsible": "Isabel Sandoval",
+          "endDate": "18/02/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "project": "Indicadores de Riesgo",
+          "client": "Mutual",
+          "lastModified": 1777315070523,
+          "startDate": "11/02/2026"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1775569054936",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1775569054936",
+          "phase": "Entrega",
+          "isArchived": false,
+          "project": "Proyecto ESVAL",
+          "comment": "",
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "22/12/2025",
+          "startDate": "16/12/2025",
+          "client": "Experis",
+          "lastModified": 1777325743677
+        }
+      },
+      {
+        "id": "nuevo-proyecto-entrega-1779225475352",
+        "data": {
+          "id": "nuevo-proyecto-entrega-1779225475352",
+          "projectId": "proj-1779225475352",
+          "client": "Mutual Reportes",
+          "phase": "Entrega",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "endDate": "27/05/2026",
+          "startDate": "25/05/2026",
+          "project": "PBI_Horizonte - PROD",
+          "progress": 100,
+          "comment": "Reporte entregado sin mayor retroalimentacion",
+          "lastModified": 1780322630032,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-levantamiento-1773759164605",
+        "data": {
+          "id": "nuevo-proyecto-levantamiento-1773759164605",
+          "phase": "Levantamiento",
+          "comment": "",
+          "startDate": "16/02/2026",
+          "project": "Proceso ACRM",
+          "responsible": "Felipe Toro",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "20/02/2026",
+          "lastModified": 1774890329900,
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-levantamiento-1773761977089",
+        "data": {
+          "id": "nuevo-proyecto-levantamiento-1773761977089",
+          "phase": "Levantamiento",
+          "responsible": "Felipe Toro",
+          "startDate": "08/12/2025",
+          "endDate": "31/12/2025",
+          "progress": 100,
+          "state": "Finalizado",
+          "comment": "",
+          "project": "Circular 2961 parte II",
+          "client": "Mutual",
+          "isArchived": false,
+          "lastModified": 1777483206001
+        }
+      },
+      {
+        "id": "nuevo-proyecto-levantamiento-1773762487872",
+        "data": {
+          "id": "nuevo-proyecto-levantamiento-1773762487872",
+          "phase": "Levantamiento",
+          "comment": "",
+          "project": "Reporte de transparencia",
+          "responsible": "Felipe Toro",
+          "startDate": "26/01/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "30/01/2026",
+          "client": "Mutual",
+          "lastModified": 1777382981295
+        }
+      },
+      {
+        "id": "nuevo-proyecto-levantamiento-1774884394544",
+        "data": {
+          "id": "nuevo-proyecto-levantamiento-1774884394544",
+          "phase": "Levantamiento",
+          "responsible": "Isabel Sandoval",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "14/01/2026",
+          "project": "Indicadores de Riesgo",
+          "comment": "",
+          "client": "Mutual",
+          "endDate": "21/01/2026",
+          "lastModified": 1777315036367
+        }
+      },
+      {
+        "id": "nuevo-proyecto-levantamiento-1775569054936",
+        "data": {
+          "id": "nuevo-proyecto-levantamiento-1775569054936",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "project": "Proyecto ESVAL",
+          "comment": "",
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "22/09/2025",
+          "startDate": "02/09/2025",
+          "client": "Experis",
+          "lastModified": 1777325743677
+        }
+      },
+      {
+        "id": "nuevo-proyecto-testing-qa-1773759164605",
+        "data": {
+          "id": "nuevo-proyecto-testing-qa-1773759164605",
+          "phase": "Testing/QA",
+          "project": "Proceso ACRM",
+          "responsible": "Felipe Toro",
+          "comment": "Pruebas exitosas en equipo de desarrollador.\n24-03-2026: Primeras pruebas exitosas en Fabric.",
+          "client": "Mutual",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "22/04/2026",
+          "lastModified": 1777580946696,
+          "startDate": "13/04/2026"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-testing-qa-1773761977089",
+        "data": {
+          "id": "nuevo-proyecto-testing-qa-1773761977089",
+          "phase": "Testing/QA",
+          "comment": "",
+          "responsible": "Felipe Toro",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "12/01/2026",
+          "endDate": "23/01/2026",
+          "project": "Circular 2961 parte II",
+          "client": "Mutual",
+          "isArchived": false,
+          "lastModified": 1777483206001
+        }
+      },
+      {
+        "id": "nuevo-proyecto-testing-qa-1773762487872",
+        "data": {
+          "id": "nuevo-proyecto-testing-qa-1773762487872",
+          "phase": "Testing/QA",
+          "comment": "",
+          "project": "Reporte de transparencia",
+          "responsible": "Felipe Toro",
+          "endDate": "13/02/2026",
+          "startDate": "09/02/2026",
+          "state": "Finalizado",
+          "progress": 100,
+          "client": "Mutual",
+          "lastModified": 1777382981295
+        }
+      },
+      {
+        "id": "nuevo-proyecto-testing-qa-1774884394544",
+        "data": {
+          "id": "nuevo-proyecto-testing-qa-1774884394544",
+          "phase": "Testing/QA",
+          "comment": "",
+          "responsible": "Isabel Sandoval",
+          "progress": 100,
+          "state": "Finalizado",
+          "project": "Indicadores de Riesgo",
+          "client": "Mutual",
+          "endDate": "11/02/2026",
+          "lastModified": 1777315089477,
+          "startDate": "04/02/2026"
+        }
+      },
+      {
+        "id": "nuevo-proyecto-testing-qa-1775569054936",
+        "data": {
+          "id": "nuevo-proyecto-testing-qa-1775569054936",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "project": "Proyecto ESVAL",
+          "comment": "",
+          "responsible": "Vicente Gonzalez",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "15/12/2025",
+          "startDate": "01/12/2025",
+          "client": "Experis",
+          "lastModified": 1777325743677
+        }
+      },
+      {
+        "id": "pacientes-activos-desarrollo-1775746789550",
+        "data": {
+          "id": "pacientes-activos-desarrollo-1775746789550",
+          "project": "Pacientes Activos",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "client": "Mutual Reportes",
+          "endDate": "22/05/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "07/05/2026",
+          "comment": "Desarrollo de panel siguiendo las directrices de mutual (de igual forma se generan 2 tablas con html) \n\nhttps://app.fabric.microsoft.com/links/PLHKbOM9-X?ctid=7dffd820-07f4-45d1-bdca-6b80af087396&pbi_source=linkShare\n\n",
+          "lastModified": 1780607262401
+        }
+      },
+      {
+        "id": "pacientes-activos-entrega-1775746789550",
+        "data": {
+          "id": "pacientes-activos-entrega-1775746789550",
+          "project": "Pacientes Activos",
+          "phase": "Entrega",
+          "startDate": "",
+          "endDate": "",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "client": "Mutual Reportes",
+          "progress": 100,
+          "lastModified": 1783538505041,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "panel-de-proyecci-n-de-ingresos-por-cotizaciones-desarrollo-1775764196648",
+        "data": {
+          "id": "panel-de-proyecci-n-de-ingresos-por-cotizaciones-desarrollo-1775764196648",
+          "project": "Panel de Proyección de Ingresos por Cotizaciones",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "endDate": "05/03/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "19/02/2026",
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "lastModified": 1777486534754
+        }
+      },
+      {
+        "id": "panel-de-proyecci-n-de-ingresos-por-cotizaciones-entrega-1775764196648",
+        "data": {
+          "id": "panel-de-proyecci-n-de-ingresos-por-cotizaciones-entrega-1775764196648",
+          "project": "Panel de Proyección de Ingresos por Cotizaciones",
+          "phase": "Entrega",
+          "isArchived": false,
+          "startDate": "05/03/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "comment": "Publicado: No",
+          "client": "Mutual Reportes",
+          "endDate": "06/03/2026",
+          "responsible": "Felipe Toro",
+          "lastModified": 1777486534754
+        }
+      },
+      {
+        "id": "panel-ep-desarrollo-1775746760743",
+        "data": {
+          "id": "panel-ep-desarrollo-1775746760743",
+          "project": "Panel EP",
+          "phase": "Desarrollo",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "13/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610975734
+        }
+      },
+      {
+        "id": "panel-ep-entrega-1775746760743",
+        "data": {
+          "id": "panel-ep-entrega-1775746760743",
+          "project": "Panel EP",
+          "phase": "Entrega",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "22/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610975735
+        }
+      },
+      {
+        "id": "panel-gesti-n-preventiva-desarrollo-1775746840339",
+        "data": {
+          "id": "panel-gesti-n-preventiva-desarrollo-1775746840339",
+          "project": "Panel Gestión Preventiva",
+          "phase": "Desarrollo",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "13/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610985554
+        }
+      },
+      {
+        "id": "panel-gesti-n-preventiva-entrega-1775746840339",
+        "data": {
+          "id": "panel-gesti-n-preventiva-entrega-1775746840339",
+          "project": "Panel Gestión Preventiva",
+          "phase": "Entrega",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "22/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610985554
+        }
+      },
+      {
+        "id": "panel-preventivo---estrat-gico-v2---experis-desarrollo-1775764314556",
+        "data": {
+          "id": "panel-preventivo---estrat-gico-v2---experis-desarrollo-1775764314556",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "project": "Panel Preventivo - Estratégico v2",
+          "endDate": "06/03/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "20/02/2026",
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "lastModified": 1777486487964
+        }
+      },
+      {
+        "id": "panel-preventivo---estrat-gico-v2---experis-entrega-1775764314556",
+        "data": {
+          "id": "panel-preventivo---estrat-gico-v2---experis-entrega-1775764314556",
+          "phase": "Entrega",
+          "isArchived": false,
+          "project": "Panel Preventivo - Estratégico v2",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "06/03/2026",
+          "endDate": "",
+          "comment": "Publicado: Si",
+          "client": "Mutual Reportes",
+          "responsible": "Felipe Toro",
+          "lastModified": 1777486487965
+        }
+      },
+      {
+        "id": "proceso-acrm---mejora-desarrollo-1785517631889",
+        "data": {
+          "id": "proceso-acrm---mejora-desarrollo-1785517631889",
+          "projectId": "proj-1785517631889",
+          "project": "Proceso ACRM - Mejora",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "comment": "",
+          "isArchived": false,
+          "startDate": "27/07/2026",
+          "responsible": "Felipe Toro",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "26/08/2026",
+          "lastModified": 1787330708579
+        }
+      },
+      {
+        "id": "proceso-acrm---mejora-entrega-1785517631889",
+        "data": {
+          "id": "proceso-acrm---mejora-entrega-1785517631889",
+          "projectId": "proj-1785517631889",
+          "project": "Proceso ACRM - Mejora",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "startDate": "27/08/2026",
+          "comment": "21-08-2026, se realiza una primera entrega con observaciones que aplazan el termino de la mejora\n\n28-08-2026, Proceso terminado a la espera de una prueba real para validar que todo este funcionando ok",
+          "endDate": "02/09/2026",
+          "progress": 100,
+          "lastModified": 1788279575720,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "proceso-acrm---mejora-levantamiento-1785517631889",
+        "data": {
+          "id": "proceso-acrm---mejora-levantamiento-1785517631889",
+          "projectId": "proj-1785517631889",
+          "project": "Proceso ACRM - Mejora",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "comment": "",
+          "isArchived": false,
+          "endDate": "24/07/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "20/07/2026",
+          "responsible": "Felipe Toro",
+          "lastModified": 1785517715156
+        }
+      },
+      {
+        "id": "proceso-acrm---mejora-testing-qa-1785517631889",
+        "data": {
+          "id": "proceso-acrm---mejora-testing-qa-1785517631889",
+          "projectId": "proj-1785517631889",
+          "project": "Proceso ACRM - Mejora",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "responsible": "Felipe Toro",
+          "startDate": "17/08/2026",
+          "endDate": "01/09/2026",
+          "progress": 100,
+          "comment": "Falta un poco\n01/09/26: Pruebas exitosas",
+          "lastModified": 1788280955350,
+          "state": "Completado"
+        }
+      },
+      {
+        "id": "proyecciones-masa-carga-a-bbdd-desarrollo-1777484595502",
+        "data": {
+          "id": "proyecciones-masa-carga-a-bbdd-desarrollo-1777484595502",
+          "projectId": "proj-1777484595502",
+          "project": "Proyecciones masa carga a BBDD",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "12/06/2026",
+          "startDate": "01/06/2026",
+          "isArchived": true,
+          "lastModified": 1780407997757
+        }
+      },
+      {
+        "id": "proyecciones-masa-carga-a-bbdd-entrega-1777484595502",
+        "data": {
+          "id": "proyecciones-masa-carga-a-bbdd-entrega-1777484595502",
+          "projectId": "proj-1777484595502",
+          "project": "Proyecciones masa carga a BBDD",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "19/06/2026",
+          "startDate": "17/06/2026",
+          "isArchived": true,
+          "lastModified": 1780407997757
+        }
+      },
+      {
+        "id": "proyecciones-masa-carga-a-bbdd-levantamiento-1777484595502",
+        "data": {
+          "id": "proyecciones-masa-carga-a-bbdd-levantamiento-1777484595502",
+          "projectId": "proj-1777484595502",
+          "project": "Proyecciones masa carga a BBDD",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "05/06/2026",
+          "startDate": "01/06/2026",
+          "isArchived": true,
+          "lastModified": 1780407997757
+        }
+      },
+      {
+        "id": "proyecciones-masa-carga-a-bbdd-testing-qa-1777484595502",
+        "data": {
+          "id": "proyecciones-masa-carga-a-bbdd-testing-qa-1777484595502",
+          "projectId": "proj-1777484595502",
+          "project": "Proyecciones masa carga a BBDD",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "responsible": "Javiera Contador",
+          "endDate": "17/06/2026",
+          "startDate": "15/06/2026",
+          "isArchived": true,
+          "lastModified": 1780407997757
+        }
+      },
+      {
+        "id": "prueba-2-desarrollo-1775746675387",
+        "data": {
+          "id": "prueba-2-desarrollo-1775746675387",
+          "phase": "Desarrollo",
+          "project": "04 Calificación Primer Nivel",
+          "client": "Mutual Reportes",
+          "responsible": "Javiera Contador",
+          "endDate": "09/06/2026",
+          "state": "En curso",
+          "startDate": "02/06/2026",
+          "comment": "modificación de formato",
+          "progress": 35,
+          "isArchived": true,
+          "lastModified": 1787333352277
+        }
+      },
+      {
+        "id": "prueba-2-entrega-1775746675387",
+        "data": {
+          "id": "prueba-2-entrega-1775746675387",
+          "phase": "Entrega",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "project": "04 Calificación Primer Nivel",
+          "client": "Mutual Reportes",
+          "responsible": "Javiera Contador",
+          "endDate": "09/06/2026",
+          "startDate": "08/06/2026",
+          "isArchived": true,
+          "lastModified": 1787333352278
+        }
+      },
+      {
+        "id": "reporte-a-externos---integracion-tratamientos-desarrollo-1785938419477",
+        "data": {
+          "id": "reporte-a-externos---integracion-tratamientos-desarrollo-1785938419477",
+          "projectId": "proj-1785938419477",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "startDate": "04/08/2026",
+          "comment": "María Teresa solicita incorporación de tratamientos, para un monitoreo más detallado de SM",
+          "project": "Reporte a externos - integracion atenciones",
+          "endDate": "18/08/2026",
+          "progress": 100,
+          "lastModified": 1787334175406,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "reporte-a-externos---integracion-tratamientos-entrega-1785938419477",
+        "data": {
+          "id": "reporte-a-externos---integracion-tratamientos-entrega-1785938419477",
+          "projectId": "proj-1785938419477",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "project": "Reporte a externos - integracion atenciones",
+          "state": "Finalizado",
+          "endDate": "03/09/2026",
+          "progress": 94,
+          "lastModified": 1788209291552,
+          "startDate": "01/09/2026"
+        }
+      },
+      {
+        "id": "reporte-a-externos---integracion-tratamientos-levantamiento-1785938419477",
+        "data": {
+          "id": "reporte-a-externos---integracion-tratamientos-levantamiento-1785938419477",
+          "projectId": "proj-1785938419477",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "endDate": "03/08/2026",
+          "startDate": "03/08/2026",
+          "comment": "03/08 reunión de Dyny, levantamiento y consultas",
+          "project": "Reporte a externos - integracion atenciones",
+          "progress": 100,
+          "lastModified": 1787334171738,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "reporte-a-externos---integracion-tratamientos-testing-qa-1785938419477",
+        "data": {
+          "id": "reporte-a-externos---integracion-tratamientos-testing-qa-1785938419477",
+          "projectId": "proj-1785938419477",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "project": "Reporte a externos - integracion atenciones",
+          "endDate": "20/08/2026",
+          "startDate": "18/08/2026",
+          "progress": 100,
+          "lastModified": 1787334183161,
+          "state": "Finalizado"
+        }
+      },
+      {
+        "id": "reporte-de-prueba-desarrollo-1775746509643",
+        "data": {
+          "id": "reporte-de-prueba-desarrollo-1775746509643",
+          "phase": "Desarrollo",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "project": "Cuentas Administración Financiero",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "13/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610994780
+        }
+      },
+      {
+        "id": "reporte-de-prueba-entrega-1775746509643",
+        "data": {
+          "id": "reporte-de-prueba-entrega-1775746509643",
+          "phase": "Entrega",
+          "responsible": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "project": "Cuentas Administración Financiero",
+          "client": "Mutual Reportes",
+          "endDate": "24/07/2026",
+          "startDate": "22/07/2026",
+          "isArchived": true,
+          "lastModified": 1783610994780
+        }
+      },
+      {
+        "id": "reportes-a-externos---arquitectura-medallon-desarrollo-1784065310462",
+        "data": {
+          "id": "reportes-a-externos---arquitectura-medallon-desarrollo-1784065310462",
+          "projectId": "proj-1784065310462",
+          "project": "Reportes a Externos - Arquitectura Medallon",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "progress": 21,
+          "comment": "Creación de procesos en plata con las tablas disponibles",
+          "state": "En curso",
+          "endDate": "",
+          "lastModified": 1785516941225,
+          "startDate": ""
+        }
+      },
+      {
+        "id": "reportes-a-externos---arquitectura-medallon-entrega-1784065310462",
+        "data": {
+          "id": "reportes-a-externos---arquitectura-medallon-entrega-1784065310462",
+          "projectId": "proj-1784065310462",
+          "project": "Reportes a Externos - Arquitectura Medallon",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "lastModified": 1784065347947
+        }
+      },
+      {
+        "id": "reportes-a-externos---arquitectura-medallon-levantamiento-1784065310462",
+        "data": {
+          "id": "reportes-a-externos---arquitectura-medallon-levantamiento-1784065310462",
+          "projectId": "proj-1784065310462",
+          "project": "Reportes a Externos - Arquitectura Medallon",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "progress": 52,
+          "state": "En curso",
+          "comment": "Reuniones con Felipe para entender el proceso\n09/07 Solicitud de tablas faltantes",
+          "endDate": "",
+          "lastModified": 1788209443067,
+          "startDate": ""
+        }
+      },
+      {
+        "id": "reportes-a-externos---arquitectura-medallon-testing-qa-1784065310462",
+        "data": {
+          "id": "reportes-a-externos---arquitectura-medallon-testing-qa-1784065310462",
+          "projectId": "proj-1784065310462",
+          "project": "Reportes a Externos - Arquitectura Medallon",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "startDate": "",
+          "endDate": "",
+          "state": "No iniciado",
+          "progress": 0,
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "lastModified": 1784065347947
+        }
+      },
+      {
+        "id": "reportes-a-externos-desarrollo-1777484845661",
+        "data": {
+          "id": "reportes-a-externos-desarrollo-1777484845661",
+          "projectId": "proj-1777484845661",
+          "project": "Reportes a Externos",
+          "client": "Mutual",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "comment": "Construcción de pipeline\nGeneración de conexión, limpieza y consolidación de data\nMejorar panel\n05/05 reunión de los origenes de datos con Dyny y Francisco",
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "06/05/2026",
+          "endDate": "22/05/2026",
+          "lastModified": 1780321333925
+        }
+      },
+      {
+        "id": "reportes-a-externos-entrega-1777484845661",
+        "data": {
+          "id": "reportes-a-externos-entrega-1777484845661",
+          "projectId": "proj-1777484845661",
+          "project": "Reportes a Externos",
+          "client": "Mutual",
+          "phase": "Entrega",
+          "comment": "",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "startDate": "08/06/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "12/06/2026",
+          "lastModified": 1781285420752
+        }
+      },
+      {
+        "id": "reportes-a-externos-levantamiento-1777484845661",
+        "data": {
+          "id": "reportes-a-externos-levantamiento-1777484845661",
+          "projectId": "proj-1777484845661",
+          "project": "Reportes a Externos",
+          "client": "Mutual",
+          "phase": "Levantamiento",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "startDate": "08/04/2026",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "28/04/2026",
+          "comment": "Responsable: Francisco\nReunión inicial 09/04\nRetraso por solicitud de acceso (acceso dado 24/04) \n24/04 reunión con María Teresa (aplazada)\n28/04 reunión con María Teresa",
+          "lastModified": 1780321416646
+        }
+      },
+      {
+        "id": "reportes-a-externos-testing-qa-1777484845661",
+        "data": {
+          "id": "reportes-a-externos-testing-qa-1777484845661",
+          "projectId": "proj-1777484845661",
+          "project": "Reportes a Externos",
+          "client": "Mutual",
+          "phase": "Testing/QA",
+          "isArchived": false,
+          "responsible": "Javiera Contador",
+          "startDate": "01/06/2026",
+          "endDate": "08/06/2026",
+          "progress": 100,
+          "comment": "Se envía documentación y panel \nReunión con María Teresa para presentarle el resultado final\nSe incorporan mejorar estéticas solicitadas por María Teresa ",
+          "state": "Finalizado",
+          "lastModified": 1780950212774
+        }
+      },
+      {
+        "id": "revisi-n-reportes-entrega-1781194681450",
+        "data": {
+          "id": "revisi-n-reportes-entrega-1781194681450",
+          "projectId": "proj-1781194681450",
+          "phase": "Entrega",
+          "project": "Revisión Reportes",
+          "responsible": "Javiera Contador",
+          "progress": 100,
+          "comment": "18/06 primer envío de observaciones modo lector de los 8 paneles\n08/07 segundo envío de observaciones modo editor\n",
+          "state": "Finalizado",
+          "endDate": "08/07/2026",
+          "startDate": "06/07/2026",
+          "isArchived": false,
+          "client": "Mutual",
+          "lastModified": 1785251994319
+        }
+      },
+      {
+        "id": "revisi-n-reportes-entrega-1785251954653",
+        "data": {
+          "id": "revisi-n-reportes-entrega-1785251954653",
+          "startDate": "",
+          "comment": "",
+          "progress": 0,
+          "state": "No iniciado",
+          "projectId": "proj-1785251954653",
+          "phase": "Entrega",
+          "client": "Mutual",
+          "endDate": "",
+          "responsible": "",
+          "project": "",
+          "isArchived": true,
+          "lastModified": 1785516905721
+        }
+      },
+      {
+        "id": "revisi-n-reportes-levantamiento-1781194681450",
+        "data": {
+          "id": "revisi-n-reportes-levantamiento-1781194681450",
+          "projectId": "proj-1781194681450",
+          "phase": "Levantamiento",
+          "startDate": "15/06/2026",
+          "project": "Revisión Reportes",
+          "responsible": "Javiera Contador",
+          "progress": 100,
+          "state": "Finalizado",
+          "endDate": "03/07/2026",
+          "comment": "Se corrobora que los datos sean correctos con la migración de pitao a Fabric\n22/06 se solicita acceso para edición \n24/06 se da acceso a edición\n06/07 se da el acceso para el panel hhee\n\nPaneles:\n-Panel de Siniestralidad\n-Panel Control Movilización\n-Panel Preventivo Estratégico\n-Panel Brochure\n-Panel Benchmark\n-Panel de Proyecciones Ingresos por Cotizaciones\n-Reporte Recaudación\n-Panel HHEE",
+          "isArchived": false,
+          "client": "Mutual",
+          "lastModified": 1785251994319
+        }
+      },
+      {
+        "id": "revisi-n-reportes-levantamiento-1785251954653",
+        "data": {
+          "phase": "Levantamiento",
+          "client": "Mutual",
+          "endDate": "",
+          "state": "No iniciado",
+          "projectId": "proj-1785251954653",
+          "startDate": "",
+          "comment": "",
+          "progress": 0,
+          "id": "revisi-n-reportes-levantamiento-1785251954653",
+          "responsible": "",
+          "project": "",
+          "isArchived": true,
+          "lastModified": 1785516905721
+        }
+      },
+      {
+        "id": "tasas-por-adhr-desarrollo-1775764407498",
+        "data": {
+          "id": "tasas-por-adhr-desarrollo-1775764407498",
+          "project": "Tasas por ADHR",
+          "phase": "Desarrollo",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "startDate": "23/02/2026",
+          "responsible": "Isabel Sandoval",
+          "comment": "\n",
+          "client": "Mutual Reportes",
+          "endDate": "06/03/2026",
+          "lastModified": 1777382887778
+        }
+      },
+      {
+        "id": "tasas-por-adhr-entrega-1775764407498",
+        "data": {
+          "id": "tasas-por-adhr-entrega-1775764407498",
+          "project": "Tasas por ADHR",
+          "phase": "Entrega",
+          "isArchived": false,
+          "progress": 100,
+          "state": "Finalizado",
+          "responsible": "Isabel Sandoval",
+          "client": "Mutual Reportes",
+          "endDate": "24/04/2026",
+          "startDate": "13/04/2026",
+          "comment": "22/04 reu con intensión de entrega, pero se solicitan incluir ciertos detalles\n27/04 entregado sin mayores comentarios\nPublicado: No",
+          "lastModified": 1780606913389
+        }
+      }
+    ],
+    "clients": [
+      {
+        "id": "experis",
+        "data": {
+          "name": "Experis",
+          "id": "experis",
+          "createdAt": 1774896568552
+        }
+      },
+      {
+        "id": "mutual",
+        "data": {
+          "name": "Mutual",
+          "id": "mutual",
+          "createdAt": 1777322933849
+        }
+      },
+      {
+        "id": "mutual-cet",
+        "data": {
+          "name": "Mutual CET",
+          "id": "mutual-cet",
+          "createdAt": 1787334625198
+        }
+      },
+      {
+        "id": "mutual-reportes",
+        "data": {
+          "name": "Mutual Reportes",
+          "id": "mutual-reportes",
+          "createdAt": 1775744396750
+        }
+      }
+    ],
+    "userRoles": [
+      {
+        "id": "5UuVU6xaUAcSEcLlfzoKlBM3tCA3",
+        "data": {
+          "uid": "5UuVU6xaUAcSEcLlfzoKlBM3tCA3",
+          "role": "lector",
+          "displayName": "Felipe Gaete",
+          "allowedClients": [
+            "Mutual Reportes",
+            "Mutual"
+          ],
+          "email": "fgaete@mutual.cl",
+          "updatedAt": 1777990488454
+        }
+      },
+      {
+        "id": "8be1i34dFSdm8ozZroUNeT9jyIE3",
+        "data": {
+          "uid": "8be1i34dFSdm8ozZroUNeT9jyIE3",
+          "role": "editor",
+          "displayName": "Vicente Gonzalez",
+          "allowedClients": [],
+          "email": "vicente.gonzalez@experis.cl",
+          "updatedAt": 1777988104968
+        }
+      },
+      {
+        "id": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+        "data": {
+          "role": "admin",
+          "uid": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "displayName": "Felipe Toro",
+          "allowedClients": [],
+          "email": "felipe.toro@manpowerchile.cl",
+          "updatedAt": 1777988182413
+        }
+      },
+      {
+        "id": "JtUYdICkB1hBQF1zSF7K776crHG3",
+        "data": {
+          "uid": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "displayName": "Javiera Contador",
+          "email": "javiera.contador@manpowerchile.cl",
+          "role": "admin",
+          "allowedClients": [],
+          "updatedAt": 1787333187218
+        }
+      },
+      {
+        "id": "JvgHQBVfOaNvNLJjTIxaKliW2RE3",
+        "data": {
+          "uid": "JvgHQBVfOaNvNLJjTIxaKliW2RE3",
+          "role": "editor",
+          "displayName": "Bastian Rojas",
+          "allowedClients": [],
+          "email": "bastian.rojas@experis.cl",
+          "updatedAt": 1787257795294
+        }
+      },
+      {
+        "id": "MuOIchhXbISREG1iTs6D7gV9a2I3",
+        "data": {
+          "uid": "MuOIchhXbISREG1iTs6D7gV9a2I3",
+          "displayName": "Rodrigo Zuñiga",
+          "email": "rodrigo.zuniga.o@experis.cl",
+          "role": "lector",
+          "allowedClients": [
+            "Experis",
+            "Mutual Reportes",
+            "Mutual"
+          ],
+          "updatedAt": 1787331561275
+        }
+      }
+    ],
+    "audit_logs": [
+      {
+        "id": "0cj5rx1oxllJvvG9L4cf",
+        "data": {
+          "timestamp": 1780407997645,
+          "date": "02-06-2026, 9:46:37 a. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "Proyecciones masa carga a BBDD",
+          "projectId": "proj-1777484595502",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "6K7RpmchBJX1vyH8Xe5M",
+        "data": {
+          "timestamp": 1777483796090,
+          "date": "29-04-2026, 1:29:56 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Algoritmo EECC",
+          "projectId": "Algoritmo EECC",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "6vR7waw9vISqtCWbu5N7",
+        "data": {
+          "timestamp": 1783610994731,
+          "date": "09-07-2026, 11:29:54 a. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "Cuentas Administración Financiero",
+          "projectId": "Cuentas Administración Financiero",
+          "client": "Mutual Reportes"
+        }
+      },
+      {
+        "id": "7UlW5mpyHv8vBnOzwW57",
+        "data": {
+          "timestamp": 1777484474174,
+          "date": "29-04-2026, 1:41:14 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Proyecciones Masa",
+          "projectId": "Proyecciones Masa",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "C0jS65SAuw6J1rx5Krat",
+        "data": {
+          "timestamp": 1777484576719,
+          "date": "29-04-2026, 1:42:56 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Proyecciones Masa",
+          "projectId": "proj-1777484484831",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "CTO1viavRMAxH5y2Db1E",
+        "data": {
+          "timestamp": 1777484158106,
+          "date": "29-04-2026, 1:35:58 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Gestión BBDD (ME2L PAD)",
+          "projectId": "Gestión BBDD (ME2L PAD)",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "Ev8QoGeiQXEVbkAFNXoz",
+        "data": {
+          "timestamp": 1777483791084,
+          "date": "29-04-2026, 1:29:51 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Algoritmo EECC",
+          "projectId": "Algoritmo EECC",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "HJPnJXH3rfbyCKRfRAIC",
+        "data": {
+          "timestamp": 1777484154471,
+          "date": "29-04-2026, 1:35:54 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Gestión BBDD (ME2L PAD)",
+          "projectId": "Gestión BBDD (ME2L PAD)",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "JpHRCK9KkahuZ4mQ303y",
+        "data": {
+          "timestamp": 1777484729136,
+          "date": "29-04-2026, 1:45:29 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Reporte Gestión/Bench.",
+          "projectId": "Reporte Gestión/Bench.",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "Mgg4NuyIEzF8te95wrWL",
+        "data": {
+          "timestamp": 1777484725472,
+          "date": "29-04-2026, 1:45:25 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Reporte Gestión/Bench.",
+          "projectId": "Reporte Gestión/Bench.",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "OvVDESs3xlvjjQw3rjh5",
+        "data": {
+          "timestamp": 1777562057296,
+          "date": "30-04-2026, 11:14:17 a. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Proyecciones Masa Carga a BBDD",
+          "projectId": "Proyecciones Masa Carga a BBDD",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "PEvegAaK8WbPEGUa9Huv",
+        "data": {
+          "timestamp": 1785516905471,
+          "date": "31-07-2026, 12:55:05 p. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "",
+          "projectId": "proj-1785251954653",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "T8D1DGp2h8kfgICad1W5",
+        "data": {
+          "timestamp": 1777484581372,
+          "date": "29-04-2026, 1:43:01 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Proyecciones Masa",
+          "projectId": "proj-1777484484831",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "TSPHUg605eCJRLBzlTJd",
+        "data": {
+          "timestamp": 1777483176398,
+          "date": "29-04-2026, 1:19:36 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Circular 2961 parte II",
+          "projectId": "Circular 2961 parte II",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "c0RIGQdypls4LyPJAByb",
+        "data": {
+          "timestamp": 1783610985491,
+          "date": "09-07-2026, 11:29:45 a. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "Panel Gestión Preventiva",
+          "projectId": "Panel Gestión Preventiva",
+          "client": "Mutual Reportes"
+        }
+      },
+      {
+        "id": "csZ9EMThjLSUP1xiwSSQ",
+        "data": {
+          "date": "28-07-2026, 11:18:48 a. m.",
+          "client": "Mutual Reportes",
+          "projectName": "Revisión Reportes",
+          "action": "ARCHIVE",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "timestamp": 1785251928990,
+          "projectId": "proj-1781194681450",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3"
+        }
+      },
+      {
+        "id": "g9cB5b8YDKTIv64Nx6P0",
+        "data": {
+          "date": "28-07-2026, 11:19:44 a. m.",
+          "client": "Mutual Reportes",
+          "projectName": "Revisión Reportes",
+          "action": "RESTORE",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "timestamp": 1785251984928,
+          "projectId": "proj-1781194681450",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3"
+        }
+      },
+      {
+        "id": "i2lLM1Z6UEAoLgh1Hrq5",
+        "data": {
+          "timestamp": 1777483205908,
+          "date": "29-04-2026, 1:20:05 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "RESTORE",
+          "projectName": "Circular 2961 parte II",
+          "projectId": "Circular 2961 parte II",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "ik73fEvndj8xbQmgjH3b",
+        "data": {
+          "timestamp": 1783610975489,
+          "date": "09-07-2026, 11:29:35 a. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "Panel EP",
+          "projectId": "Panel EP",
+          "client": "Mutual Reportes"
+        }
+      },
+      {
+        "id": "jR3cLBvT9739v9vuRLFq",
+        "data": {
+          "timestamp": 1777484478156,
+          "date": "29-04-2026, 1:41:18 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Proyecciones Masa",
+          "projectId": "Proyecciones Masa",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "jvbPv3mUg6tpd7mkK64h",
+        "data": {
+          "timestamp": 1783346712935,
+          "date": "06-07-2026, 10:05:12 a. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Gestión BBDD (ME2L PAD)",
+          "projectId": "proj-1777484166998",
+          "client": "Mutual"
+        }
+      },
+      {
+        "id": "lZmzVahwVnMRKN9YuioG",
+        "data": {
+          "timestamp": 1777484833699,
+          "date": "29-04-2026, 1:47:13 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Reportes a Externos",
+          "projectId": "Reportes a Externos",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "le2vcVrz3tHpEyysm49U",
+        "data": {
+          "timestamp": 1777484836487,
+          "date": "29-04-2026, 1:47:16 p. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "DELETE_PERMANENT",
+          "projectName": "Reportes a Externos",
+          "projectId": "Reportes a Externos",
+          "client": "Nexus"
+        }
+      },
+      {
+        "id": "ol4bILzl4X4wT6QNXtiZ",
+        "data": {
+          "timestamp": 1787333352160,
+          "date": "21-08-2026, 1:29:12 p. m.",
+          "userEmail": "javiera.contador@manpowerchile.cl",
+          "userId": "JtUYdICkB1hBQF1zSF7K776crHG3",
+          "action": "ARCHIVE",
+          "projectName": "04 Calificación Primer Nivel",
+          "projectId": "04 Calificación Primer Nivel",
+          "client": "Mutual Reportes"
+        }
+      },
+      {
+        "id": "sxhtm2jhqI6MUxreqlNH",
+        "data": {
+          "timestamp": 1783346705952,
+          "date": "06-07-2026, 10:05:05 a. m.",
+          "userEmail": "felipe.toro@manpowerchile.cl",
+          "userId": "Cj6loz5F1fPZN43tg9dP7CPGepf1",
+          "action": "ARCHIVE",
+          "projectName": "Automatización Reporte Gestión / Benchmark",
+          "projectId": "proj-1777484747206",
+          "client": "Mutual"
+        }
+      }
+    ],
+    "telegram_sessions": []
+  }
+}

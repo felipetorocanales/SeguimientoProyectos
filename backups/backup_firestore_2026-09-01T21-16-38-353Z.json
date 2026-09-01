@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "projectId": "nexus-tracker-b7a75",
+    "timestamp": "2026-09-01T21:15:55.140Z",
+    "version": "1.0"
+  },
+  "collections": {
+    "phases": [],
+    "clients": [],
+    "userRoles": [],
+    "audit_logs": [],
+    "telegram_sessions": []
+  }
+}
