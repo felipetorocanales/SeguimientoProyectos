@@ -22,6 +22,7 @@ const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const express = require("express");
 const { apiKeyMiddleware } = require("./auth");
+const { handleTelegramWebhook } = require("./telegram");
 const {
   groupPhasesIntoProjects,
   findProjectByName,
@@ -42,13 +43,23 @@ app.use(express.json());
 // CORS - allow Power Automate and Teams to call the API
 app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS");
+  res.set("Access-Control-Allow-Methods", "GET, PATCH, POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, X-API-Key");
   if (req.method === "OPTIONS") return res.status(204).send("");
   next();
 });
 
-// Apply API Key auth to all routes
+// Telegram Webhook route (must be before API key middleware since Telegram sends unauthenticated POSTs)
+app.post("/telegram-webhook", (req, res) => {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  if (!token) {
+    console.error("[Telegram] TELEGRAM_BOT_TOKEN environment variable not set");
+    return res.status(500).send("Telegram token not configured");
+  }
+  return handleTelegramWebhook(req, res, db, COLLECTION, token);
+});
+
+// Apply API Key auth to all remaining routes
 app.use(apiKeyMiddleware);
 
 // ─── Helper: load all active phases from Firestore ───────────────────────────
@@ -232,7 +243,7 @@ app.use((req, res) => {
 // ─── Export as Firebase Function ──────────────────────────────────────────────
 exports.api = onRequest(
   {
-    secrets: ["NEXUS_API_KEY"],
+    secrets: ["NEXUS_API_KEY", "TELEGRAM_BOT_TOKEN"],
     invoker: "public",
   },
   app
