@@ -933,8 +933,9 @@ function renderGantt() {
 }
 
 // ─── Per-Project Mini Gantt ────────────────────────────────────────────────
+// ─── Per-Project Mini Gantt ────────────────────────────────────────────────
 function buildPhaseGanttTable(proj, timeline, projColor) {
-  if (!timeline || timeline.length === 0) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Sin datos de semanas.</p>';
+  if (!timeline || timeline.length === 0) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Sin datos de fechas.</p>';
   const totalCols = timeline.length;
   const isMonths = appState.ganttViewMode === 'months';
   const COL_W = isMonths ? 100 : 80, LABEL_W = 200;
@@ -943,52 +944,57 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
     `<th style="min-width:${COL_W}px; padding:0.5rem 0 0.5rem 6px; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left; background:rgba(0,0,0,0.3); border-left:1px solid var(--card-border); white-space:nowrap;">${isMonths ? monthLabel(d) : weekLabel(d)}</th>`
   ).join('');
 
-  const rowsHtml = proj.phases.map(phase => {
-    const s = parseDate(phase.startDate);
-    const e = parseDate(phase.endDate);
-    if (!s || !e) return '';
-    const startBucket = isMonths ? monthStart(s) : weekStart(s);
-    const endBucket   = isMonths ? monthStart(e) : weekStart(e);
-    const startCol  = timeline.findIndex(d => d.getTime() === startBucket.getTime());
-    let   endCol    = timeline.findIndex(d => d.getTime() === endBucket.getTime());
-    if (endCol === -1) endCol = totalCols - 1;
-    if (startCol === -1) return '';
-    const span  = Math.max(1, endCol - startCol + 1);
-    const color = PHASE_COLORS[phase.phase] || projColor;
+  const s = parseDate(proj.startDate);
+  const e = parseDate(proj.deliveryDate);
+  if (!s || !e) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Fechas no definidas para este proyecto.</p>';
 
-    // Precise visual offset and width calculation (WORKING DAYS ONLY)
-    const nextBucketDate = timeline[endCol + 1] || (isMonths ? addDays(endBucket, 32) : addDays(endBucket, 7));
-    const spanEndDate = new Date(nextBucketDate.getTime() - 86400000);
-    const totalSpanWorkingDays = getWorkingDaysBetween(startBucket, spanEndDate);
+  const startBucket = isMonths ? monthStart(s) : weekStart(s);
+  const endBucket   = isMonths ? monthStart(e) : weekStart(e);
+  const startCol  = timeline.findIndex(d => d.getTime() === startBucket.getTime());
+  let   endCol    = timeline.findIndex(d => d.getTime() === endBucket.getTime());
+  if (endCol === -1) endCol = totalCols - 1;
+  if (startCol === -1) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Fuera de rango de visualización.</p>';
+  const span  = Math.max(1, endCol - startCol + 1);
 
-    let offsetDays = 0;
-    if (s > startBucket) {
-      offsetDays = Math.max(0, getWorkingDaysBetween(startBucket, s) - 1);
-    }
-    
-    const durationDays = Math.max(1, getWorkingDaysBetween(s, e));
-    
-    let offsetPercent = (offsetDays / totalSpanWorkingDays) * 100;
-    let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
-    if (widthPercent + offsetPercent > 100) widthPercent = 100 - offsetPercent;
+  let color = '#38bdf8';
+  if (proj.health === 'completed') color = 'var(--status-done)';
+  else if (proj.health === 'delayed') color = 'var(--exec-soft-coral)';
+  else if (proj.health === 'at_risk') color = '#f59e0b';
 
-    const cells = timeline.map((_, ci) => {
-      if (ci === startCol) return `<td colspan="${span}" style="padding:0.4rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
-        <div style="position:relative; height:26px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
-          <div title="${phase.startDate} – ${phase.endDate}" 
-               style="background:${color}; opacity:0.9; border-radius:6px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.68rem; font-weight:600; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 2px 6px ${color}55;">
-            <span style="overflow:hidden; text-overflow:ellipsis;">${phase.phase}</span>
-            <span style="margin-left:0.5rem; opacity:0.85;">${phase.progress || 0}%</span>
-          </div>
-        </div></td>`;
-      if (ci > startCol && ci < startCol + span) return '';
-      return `<td style="border-left:1px solid rgba(255,255,255,0.04);"></td>`;
-    }).join('');
+  // Precise visual offset and width calculation (WORKING DAYS ONLY)
+  const nextBucketDate = timeline[endCol + 1] || (isMonths ? addDays(endBucket, 32) : addDays(endBucket, 7));
+  const spanEndDate = new Date(nextBucketDate.getTime() - 86400000);
+  const totalSpanWorkingDays = getWorkingDaysBetween(startBucket, spanEndDate);
 
-    return `<tr style="height:44px;">
-      <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 0.75rem; font-size:0.75rem; font-weight:600; color:var(--text-main); background: color-mix(in srgb, ${color} 10%, #0a0c14); border-right:2px solid ${color}88; position:sticky; left:0; z-index:2; overflow:visible; white-space:normal; line-height:1.2; box-shadow: 6px 0 10px -6px rgba(0,0,0,0.5);">${phase.phase}</td>
-      ${cells}</tr>`;
+  let offsetDays = 0;
+  if (s > startBucket) {
+    offsetDays = Math.max(0, getWorkingDaysBetween(startBucket, s) - 1);
+  }
+  
+  const durationDays = Math.max(1, getWorkingDaysBetween(s, e));
+  
+  let offsetPercent = (offsetDays / totalSpanWorkingDays) * 100;
+  let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
+  if (widthPercent + offsetPercent > 100) widthPercent = 100 - offsetPercent;
+
+  const cells = timeline.map((_, ci) => {
+    if (ci === startCol) return `<td colspan="${span}" style="padding:0.4rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
+      <div style="position:relative; height:28px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
+        <div title="${proj.startDate} → ${proj.deliveryDate} | ${proj.overallProgress}% transcurrido" 
+             style="background:${color}; opacity:0.95; border-radius:6px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.4);">
+          <span style="overflow:hidden; text-overflow:ellipsis;">${proj.startDate} → ${proj.deliveryDate}</span>
+          <span style="margin-left:0.5rem; background:rgba(0,0,0,0.25); padding:0.1rem 0.4rem; border-radius:4px;">${proj.overallProgress}%</span>
+        </div>
+      </div></td>`;
+    if (ci > startCol && ci < startCol + span) return '';
+    return `<td style="border-left:1px solid rgba(255,255,255,0.04);"></td>`;
   }).join('');
+
+  const rowsHtml = `<tr style="height:46px;">
+    <td style="min-width:${LABEL_W}px; max-width:${LABEL_W}px; padding:0 0.75rem; font-size:0.75rem; font-weight:700; color:#38bdf8; background: color-mix(in srgb, ${color} 12%, #071536); border-right:2px solid ${color}; position:sticky; left:0; z-index:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.2; box-shadow: 6px 0 10px -6px rgba(0,0,0,0.5);">
+      Proyecto Completo
+    </td>
+    ${cells}</tr>`;
 
   const todayX = getTodayX(timeline, LABEL_W, COL_W);
   const todayLine = todayX !== null ? `<div class="today-line" style="left:${todayX}; height: 100%;"></div>` : '';
@@ -1000,7 +1006,7 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
       <table style="border-collapse:collapse; width:100%; table-layout:fixed;">
         <colgroup><col style="width:${LABEL_W}px;">${timeline.map(() => `<col style="width:${COL_W}px;">`).join('')}</colgroup>
         <thead><tr>
-          <th style="position:sticky; left:0; z-index:3; background:rgba(10,12,20,0.98); min-width:${LABEL_W}px; padding:0.5rem 0.75rem; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left;">Fase</th>
+          <th style="position:sticky; left:0; z-index:3; background:rgba(10,12,20,0.98); min-width:${LABEL_W}px; padding:0.5rem 0.75rem; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-align:left;">Periodo</th>
           ${headerCells}
         </tr></thead>
         <tbody style="background:rgba(0,0,0,0.15);">${rowsHtml}</tbody>
@@ -1331,7 +1337,7 @@ function renderProjectCard(proj, index, isArchived) {
 
     <!-- Hidden per-project mini Gantt -->
     <div id="gantt-panel-${safeId}" style="display:${isExpanded ? 'block' : 'none'}; overflow-x:auto; margin-top:0.5rem; border-top:1px solid var(--card-border); background:rgba(0,0,0,0.15); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg);">
-      ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases(proj.phases) : getWeeksForPhases(proj.phases), projColor)}
+      ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]) : getWeeksForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]), projColor)}
     </div>
   </div>`;
 }

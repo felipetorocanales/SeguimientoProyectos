@@ -288,15 +288,6 @@ export function aggregateProjectData(phases) {
       };
     }
 
-    const proj = projects[groupingKey];
-    proj.phases.push(item);
-
-    if (item.startDate && (!proj.startDate || parseDate(item.startDate) < parseDate(proj.startDate))) {
-      proj.startDate = item.startDate;
-    }
-    if ((item.deliveryDate || item.endDate) && (!proj.deliveryDate || parseDate(item.deliveryDate || item.endDate) > parseDate(proj.deliveryDate))) {
-      proj.deliveryDate = item.deliveryDate || item.endDate;
-    }
     if (item.responsible && !proj.responsible) {
       proj.responsible = item.responsible;
     }
@@ -309,6 +300,19 @@ export function aggregateProjectData(phases) {
   today.setHours(0, 0, 0, 0);
 
   Object.values(projects).forEach(proj => {
+    // Strictly take earliest start date and latest delivery/end date across all phases
+    const allStarts = proj.phases.map(p => parseDate(p.startDate)).filter(Boolean);
+    const allEnds = proj.phases.map(p => parseDate(p.endDate || p.deliveryDate)).filter(Boolean);
+
+    if (allStarts.length > 0) {
+      const minStart = new Date(Math.min(...allStarts));
+      proj.startDate = `${String(minStart.getDate()).padStart(2, '0')}/${String(minStart.getMonth() + 1).padStart(2, '0')}/${minStart.getFullYear()}`;
+    }
+    if (allEnds.length > 0) {
+      const maxEnd = new Date(Math.max(...allEnds));
+      proj.deliveryDate = `${String(maxEnd.getDate()).padStart(2, '0')}/${String(maxEnd.getMonth() + 1).padStart(2, '0')}/${maxEnd.getFullYear()}`;
+    }
+
     const phaseOrder = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega', 'Ciclo Principal'];
     proj.phases.sort((a, b) => phaseOrder.indexOf(a.phase) - phaseOrder.indexOf(b.phase));
 
