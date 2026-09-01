@@ -1,11 +1,12 @@
 /**
  * telegram.js - Telegram Bot Webhook Handler for Nexus Tracker
  *
- * Implements a streamlined, frictionless 3-step project update wizard:
+ * Implements a frictionless 2-step project update wizard (100% AI-Driven):
  *   1. Select Project (interactive buttons)
- *   2. Select Health Indicator (🟢 Bien / 🟡 Con Riesgos / 🔴 Bloqueado)
- *   3. Record Achievements (text or skip)
- *   4. Record Blockers (text or none)
+ *   2. Record Achievements (text or skip)
+ *   3. Record Blockers (text or none)
+ *
+ * The AI (Gemini) automatically infers the project's health status and stage.
  */
 
 const https = require("https");
@@ -166,45 +167,12 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
           return res.status(200).send("OK");
         }
 
-        // Save session and ask for Health directly
+        // Save session and ask for Achievements directly
         await sessionRef(chatId).set({
           chatId: String(chatId),
-          step: "SELECT_HEALTH",
+          step: "AWAITING_ACHIEVEMENTS",
           projectId: project.projectId,
           projectName: project.name,
-          updatedAt: Date.now(),
-        });
-
-        const healthButtons = [
-          [{ text: "🟢 Bien (En tiempo y forma)", callback_data: "health:verde" }],
-          [{ text: "🟡 Con Riesgos (Manejables)", callback_data: "health:amarillo" }],
-          [{ text: "🔴 Bloqueado (Problemas / Freno)", callback_data: "health:rojo" }],
-          [{ text: "❌ Cancelar", callback_data: "cancel_wizard" }],
-        ];
-
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          `📌 Proyecto: <b>${escapeHtml(project.name)}</b>\n\n🚦 <b>¿Cuál es el estado de salud del proyecto?</b>`,
-          { inline_keyboard: healthButtons }
-        );
-        return res.status(200).send("OK");
-      }
-
-      // STEP 2 CLICK: HEALTH SELECTED (`health:<color>`)
-      if (data.startsWith("health:")) {
-        const healthColor = data.replace("health:", "");
-        const session = await getSession(chatId);
-
-        if (!session || !session.projectId) {
-          await sendTelegramMessage(botToken, chatId, "⚠️ Sesión expirada. Escribe /actualizar para iniciar de nuevo.");
-          return res.status(200).send("OK");
-        }
-
-        // Update session
-        await sessionRef(chatId).update({
-          step: "AWAITING_ACHIEVEMENTS",
-          healthIndicator: healthColor,
           updatedAt: Date.now(),
         });
 
@@ -216,13 +184,13 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
         await sendTelegramMessage(
           botToken,
           chatId,
-          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n\n🏆 <b>¿Qué lograron esta semana o período?</b>\n<i>(Escribe los avances en un mensaje o presiona "Omitir logros")</i>`,
+          `📌 Proyecto: <b>${escapeHtml(project.name)}</b>\n\n🏆 <b>¿Qué lograron esta semana o período?</b>\n<i>(Escribe tus avances en un mensaje o presiona "Omitir logros")</i>`,
           { inline_keyboard: skipButtons }
         );
         return res.status(200).send("OK");
       }
 
-      // STEP 3 CLICK: SKIP ACHIEVEMENTS (`skip_achievements`)
+      // STEP 2 CLICK: SKIP ACHIEVEMENTS (`skip_achievements`)
       if (data === "skip_achievements") {
         const session = await getSession(chatId);
         if (!session || !session.projectId) {
@@ -250,7 +218,7 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
         return res.status(200).send("OK");
       }
 
-      // STEP 4 CLICK: SKIP BLOCKERS (`skip_blockers`)
+      // STEP 3 CLICK: SKIP BLOCKERS (`skip_blockers`)
       if (data === "skip_blockers") {
         const session = await getSession(chatId);
         if (!session || !session.projectId) {
@@ -295,7 +263,7 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
 📊 <b>/resumen</b> - Ver KPIs del tablero ejecutivo
 📋 <b>/proyectos</b> - Listar proyectos activos <i>(filtros: todo, completados, riesgo, retrasados)</i>
 🔍 <b>/buscar &lt;nombre&gt;</b> - Consultar estado de un proyecto
-✏️ <b>/actualizar</b> - Actualizar logros y bloqueos en 3 pasos`;
+✏️ <b>/actualizar</b> - Actualizar logros y bloqueos del proyecto`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -414,7 +382,6 @@ ${project.comment ? escapeHtml(project.comment.split("\n").slice(-4).join("\n"))
         return res.status(200).send("OK");
       }
 
-      // Generate buttons for active projects (1 per row)
       const projectButtons = activeProjects.map((p) => {
         let badge = "🟢";
         if (p.health === "at_risk") badge = "⚠️";
@@ -509,12 +476,11 @@ function getChileDateShort() {
  * Execute the project update in Firestore and send final confirmation
  */
 async function executeProjectUpdate(db, collectionName, session, blockersText, botToken, chatId) {
-  const { projectName, projectId, healthIndicator, achievements } = session;
+  const { projectName, projectId, achievements } = session;
 
   const snapshot = await db.collection(collectionName).get();
   const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  // Find all matching docs for this project (or the single project doc)
   const matchingDocs = allDocs.filter(
     (p) =>
       p.projectId === projectId ||
@@ -527,15 +493,9 @@ async function executeProjectUpdate(db, collectionName, session, blockersText, b
     return;
   }
 
-  // Format new structured update log
+  // Format new structured update log without manual health
   const todayStr = getChileDateShort();
-  let healthIcon = "";
-  if (healthIndicator === "verde") healthIcon = "🟢 Bien";
-  else if (healthIndicator === "amarillo") healthIcon = "🟡 Con Riesgos";
-  else if (healthIndicator === "rojo") healthIcon = "🔴 Bloqueado";
-
   const commentParts = [];
-  if (healthIcon) commentParts.push(`Salud: ${healthIcon}`);
   if (achievements && achievements !== "Ninguno reportado") commentParts.push(`Logros: ${achievements.trim()}`);
   if (blockersText && blockersText !== "Ninguno" && blockersText !== "") commentParts.push(`Bloqueos: ${blockersText.trim()}`);
 
@@ -555,12 +515,13 @@ async function executeProjectUpdate(db, collectionName, session, blockersText, b
   await Promise.all(updatePromises);
 
   const confirmation = 
-`✅ <b>¡Proyecto Actualizado con Éxito!</b>
+`✅ <b>¡Actualización Registrada!</b>
 
 📌 <b>Proyecto:</b> ${escapeHtml(projectName)}
-🚦 <b>Estado Reportado:</b> ${healthIcon || "🟢"}
 🏆 <b>Logros:</b> ${escapeHtml(achievements && achievements !== "Ninguno reportado" ? achievements : "Sin novedades")}
-⚠️ <b>Bloqueos:</b> ${escapeHtml(blockersText && blockersText !== "Ninguno" ? blockersText : "Ninguno")}`;
+⚠️ <b>Bloqueos:</b> ${escapeHtml(blockersText && blockersText !== "Ninguno" ? blockersText : "Ninguno")}
+
+🤖 <i>La IA analizará estos comentarios para clasificar el estado y la etapa del proyecto.</i>`;
 
   await sendTelegramMessage(botToken, chatId, confirmation);
 }
