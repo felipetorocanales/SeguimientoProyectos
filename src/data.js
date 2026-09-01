@@ -288,6 +288,9 @@ export function aggregateProjectData(phases) {
       };
     }
 
+    const proj = projects[groupingKey];
+    proj.phases.push(item);
+
     if (item.responsible && !proj.responsible) {
       proj.responsible = item.responsible;
     }
