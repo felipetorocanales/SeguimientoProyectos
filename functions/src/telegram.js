@@ -1,12 +1,11 @@
 /**
  * telegram.js - Telegram Bot Webhook Handler for Nexus Tracker
  *
- * Implements an interactive multi-step wizard using Telegram Inline Keyboards
- * and Firestore session state for updating projects step-by-step:
+ * Implements a streamlined, frictionless 3-step project update wizard:
  *   1. Select Project (interactive buttons)
- *   2. Select Phase (interactive buttons)
- *   3. Select/Enter Percentage (quick buttons or custom number)
- *   4. Leave Comment (type message or click "Sin comentario")
+ *   2. Select Health Indicator (🟢 Bien / 🟡 Con Riesgos / 🔴 Bloqueado)
+ *   3. Record Achievements (text or skip)
+ *   4. Record Blockers (text or none)
  */
 
 const https = require("https");
@@ -167,36 +166,34 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
           return res.status(200).send("OK");
         }
 
-        // Save session
+        // Save session and ask for Health directly
         await sessionRef(chatId).set({
           chatId: String(chatId),
-          step: "SELECT_PHASE",
+          step: "SELECT_HEALTH",
           projectId: project.projectId,
           projectName: project.name,
           updatedAt: Date.now(),
         });
 
-        // Generate phase buttons
-        const phaseButtons = project.phases.map((p) => [
-          {
-            text: `${p.state === "Completado" ? "✅" : "🔹"} ${p.phase} (${p.progress}%)`,
-            callback_data: `phase:${p.phase}`,
-          },
-        ]);
-        phaseButtons.push([{ text: "❌ Cancelar", callback_data: "cancel_wizard" }]);
+        const healthButtons = [
+          [{ text: "🟢 Bien (En tiempo y forma)", callback_data: "health:verde" }],
+          [{ text: "🟡 Con Riesgos (Manejables)", callback_data: "health:amarillo" }],
+          [{ text: "🔴 Bloqueado (Problemas / Freno)", callback_data: "health:rojo" }],
+          [{ text: "❌ Cancelar", callback_data: "cancel_wizard" }],
+        ];
 
         await sendTelegramMessage(
           botToken,
           chatId,
-          `📌 Proyecto seleccionador: <b>${escapeHtml(project.name)}</b>\n\n¿Qué fase deseas actualizar?`,
-          { inline_keyboard: phaseButtons }
+          `📌 Proyecto: <b>${escapeHtml(project.name)}</b>\n\n🚦 <b>¿Cuál es el estado de salud del proyecto?</b>`,
+          { inline_keyboard: healthButtons }
         );
         return res.status(200).send("OK");
       }
 
-      // STEP 2 CLICK: PHASE SELECTED (`phase:<phaseName>`)
-      if (data.startsWith("phase:")) {
-        const phaseName = data.replace("phase:", "");
+      // STEP 2 CLICK: HEALTH SELECTED (`health:<color>`)
+      if (data.startsWith("health:")) {
+        const healthColor = data.replace("health:", "");
         const session = await getSession(chatId);
 
         if (!session || !session.projectId) {
@@ -206,79 +203,8 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
 
         // Update session
         await sessionRef(chatId).update({
-          step: "SELECT_HEALTH",
-          phaseName: phaseName,
-          updatedAt: Date.now(),
-        });
-
-        const healthButtons = [
-          [{ text: "🟢 Bien (En tiempo)", callback_data: "health:verde" }],
-          [{ text: "🟡 Con Riesgos (Manejables)", callback_data: "health:amarillo" }],
-          [{ text: "🔴 Bloqueado (Problemas)", callback_data: "health:rojo" }],
-          [{ text: "❌ Cancelar", callback_data: "cancel_wizard" }],
-        ];
-
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n🔹 Fase: <b>${escapeHtml(phaseName)}</b>\n\n🚦 ¿Cuál es el estado de salud actual de esta fase?`,
-          { inline_keyboard: healthButtons }
-        );
-        return res.status(200).send("OK");
-      }
-
-      // STEP 2.5 CLICK: HEALTH SELECTED (`health:<color>`)
-      if (data.startsWith("health:")) {
-        const healthColor = data.replace("health:", "");
-        const session = await getSession(chatId);
-
-        if (!session || !session.projectId || !session.phaseName) {
-          await sendTelegramMessage(botToken, chatId, "⚠️ Sesión expirada. Escribe /actualizar para iniciar de nuevo.");
-          return res.status(200).send("OK");
-        }
-
-        // Update session
-        await sessionRef(chatId).update({
-          step: "AWAITING_PROGRESS",
-          healthIndicator: healthColor,
-          updatedAt: Date.now(),
-        });
-
-        // Quick percentage buttons
-        const pctButtons = [
-          [
-            { text: "0%", callback_data: "pct:0" },
-            { text: "25%", callback_data: "pct:25" },
-            { text: "50%", callback_data: "pct:50" },
-            { text: "75%", callback_data: "pct:75" },
-            { text: "100%", callback_data: "pct:100" },
-          ],
-          [{ text: "❌ Cancelar", callback_data: "cancel_wizard" }],
-        ];
-
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n🔹 Fase: <b>${escapeHtml(session.phaseName)}</b>\n\n📊 ¿Qué porcentaje de avance tiene esta fase?\n<i>(Selecciona una opción o escribe un número de 0 a 100 en un mensaje)</i>`,
-          { inline_keyboard: pctButtons }
-        );
-        return res.status(200).send("OK");
-      }
-
-      // STEP 3 CLICK: PERCENTAGE SELECTED (`pct:<number>`)
-      if (data.startsWith("pct:")) {
-        const pctNum = parseInt(data.replace("pct:", ""), 10);
-        const session = await getSession(chatId);
-
-        if (!session || !session.projectId || !session.phaseName) {
-          await sendTelegramMessage(botToken, chatId, "⚠️ Sesión expirada. Escribe /actualizar para iniciar de nuevo.");
-          return res.status(200).send("OK");
-        }
-
-        // Update session
-        await sessionRef(chatId).update({
           step: "AWAITING_ACHIEVEMENTS",
-          progress: pctNum,
+          healthIndicator: healthColor,
           updatedAt: Date.now(),
         });
 
@@ -290,16 +216,16 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
         await sendTelegramMessage(
           botToken,
           chatId,
-          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n🔹 Fase: <b>${escapeHtml(session.phaseName)}</b> (${pctNum}%)\n\n🏆 <b>¿Qué lograron esta semana?</b>\n<i>(Escribe los hitos concretos en un mensaje, o presiona Omitir)</i>`,
+          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n\n🏆 <b>¿Qué lograron esta semana o período?</b>\n<i>(Escribe los avances en un mensaje o presiona "Omitir logros")</i>`,
           { inline_keyboard: skipButtons }
         );
         return res.status(200).send("OK");
       }
 
-      // STEP 4 CLICK: SKIP ACHIEVEMENTS (`skip_achievements`)
+      // STEP 3 CLICK: SKIP ACHIEVEMENTS (`skip_achievements`)
       if (data === "skip_achievements") {
         const session = await getSession(chatId);
-        if (!session || !session.projectId || !session.phaseName) {
+        if (!session || !session.projectId) {
           await sendTelegramMessage(botToken, chatId, "⚠️ Sesión expirada. Escribe /actualizar para iniciar de nuevo.");
           return res.status(200).send("OK");
         }
@@ -318,21 +244,21 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
         await sendTelegramMessage(
           botToken,
           chatId,
-          `⚠️ <b>¿Qué los está frenando o bloqueando?</b>\n<i>(Falta de respuesta, problemas técnicos, etc. Escribe en un mensaje o presiona Ninguno)</i>`,
+          `⚠️ <b>¿Qué los está frenando o bloqueando?</b>\n<i>(Falta de respuesta del cliente, accesos pendientes, problemas técnicos, etc. O presiona "Ninguno")</i>`,
           { inline_keyboard: skipBlockButtons }
         );
         return res.status(200).send("OK");
       }
 
-      // STEP 5 CLICK: SKIP BLOCKERS (`skip_blockers`)
+      // STEP 4 CLICK: SKIP BLOCKERS (`skip_blockers`)
       if (data === "skip_blockers") {
         const session = await getSession(chatId);
-        if (!session || !session.projectId || !session.phaseName) {
+        if (!session || !session.projectId) {
           await sendTelegramMessage(botToken, chatId, "⚠️ Sesión expirada. Escribe /actualizar para iniciar de nuevo.");
           return res.status(200).send("OK");
         }
 
-        await executePhaseUpdate(db, collectionName, session, "Ninguno", botToken, chatId);
+        await executeProjectUpdate(db, collectionName, session, "Ninguno", botToken, chatId);
         await clearSession(chatId);
         return res.status(200).send("OK");
       }
@@ -369,7 +295,7 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
 📊 <b>/resumen</b> - Ver KPIs del tablero ejecutivo
 📋 <b>/proyectos</b> - Listar proyectos activos <i>(filtros: todo, completados, riesgo, retrasados)</i>
 🔍 <b>/buscar &lt;nombre&gt;</b> - Consultar estado de un proyecto
-✏️ <b>/actualizar</b> - Iniciar asistente interactivo paso a paso`;
+✏️ <b>/actualizar</b> - Actualizar logros y bloqueos en 3 pasos`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -390,7 +316,7 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
 🚨 <b>Retrasados:</b> ${summary.delayed}
 📈 <b>Cumplimiento SLA:</b> <b>${summary.sla}%</b>
 
-${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos críticos (${summary.criticalProjects.length}):</b>\n` + summary.criticalProjects.map(p => `• ${escapeHtml(p)}`).join("\n") : "✨ ¡No hay proyectos críticos en riesgo!"}`;
+${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos en foco (${summary.criticalProjects.length}):</b>\n` + summary.criticalProjects.map(p => `• ${escapeHtml(p)}`).join("\n") : "✨ ¡No hay proyectos críticos en riesgo!"}`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
@@ -417,7 +343,6 @@ ${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos críticos (${summary.
         filtered = allProjects.filter((p) => p.health === "delayed");
         title = "🚨 Proyectos Retrasados";
       } else {
-        // Default: only active projects (exclude completed)
         filtered = allProjects.filter((p) => p.health !== "completed");
         title = "📋 Proyectos Activos";
       }
@@ -434,7 +359,7 @@ ${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos críticos (${summary.
         else if (p.health === "at_risk") badge = "⚠️";
         else if (p.health === "delayed") badge = "🚨";
 
-        reply += `${badge} <b>${escapeHtml(p.name)}</b>\n   ├ Progreso: <b>${p.overallProgress}%</b> (${escapeHtml(p.healthLabel)})\n   └ Cliente: ${escapeHtml(p.client)}\n\n`;
+        reply += `${badge} <b>${escapeHtml(p.name)}</b>\n   ├ Tiempo transcurrido: <b>${p.overallProgress}%</b> (${escapeHtml(p.healthLabel)})\n   └ Cliente: ${escapeHtml(p.client)}\n\n`;
       });
 
       if (filtered.length > 15) {
@@ -463,54 +388,24 @@ ${summary.criticalProjects.length > 0 ? `🔥 <b>Proyectos críticos (${summary.
         return res.status(200).send("OK");
       }
 
-      let phasesText = project.phases.map(p => {
-        let st = p.state === "Completado" ? "✅" : (p.state === "En curso" ? "🔄" : "⏳");
-        const cleanComment = p.comment ? ` <i>("${escapeHtml(p.comment)}")</i>` : "";
-        return `   • <b>${escapeHtml(p.phase)}:</b> ${p.progress}% ${st}${cleanComment}`;
-      }).join("\n");
-
       const reply = 
 `📌 <b>Detalle de Proyecto:</b>
 
 <b>Nombre:</b> ${escapeHtml(project.name)}
 <b>Cliente:</b> ${escapeHtml(project.client)}
 <b>Responsable:</b> ${escapeHtml(project.responsible || "No asignado")}
-<b>Estado Global:</b> ${escapeHtml(project.healthLabel)} (${project.overallProgress}%)
+<b>Estado:</b> ${escapeHtml(project.healthLabel)} (${project.overallProgress}% tiempo transcurrido)
 📅 <b>Fecha Entrega:</b> ${escapeHtml(project.deliveryDate || "No definida")}
 
-<b>Fases:</b>
-${phasesText}`;
+📝 <b>Últimas Actualizaciones:</b>
+${project.comment ? escapeHtml(project.comment.split("\n").slice(-4).join("\n")) : "<i>Sin comentarios registrados</i>"}`;
 
       await sendTelegramMessage(botToken, chatId, reply);
       return res.status(200).send("OK");
     }
 
-    // ─── COMMAND: /actualizar (INTERACTIVE WIZARD START OR DIRECT LINE) ───────
+    // ─── COMMAND: /actualizar (INTERACTIVE WIZARD) ───────────────────────────
     if (text.startsWith("/actualizar") || text.toLowerCase() === "actualizar") {
-      const raw = text.replace("/actualizar", "").trim();
-
-      // Check if user provided inline pipeline syntax: `/actualizar Proyecto | Fase | 80 | Comentario`
-      if (raw.includes("|")) {
-        const parts = raw.split("|").map(p => p.trim());
-        if (parts.length >= 3) {
-          const [projectNameSearch, phaseSearch, progressStr, commentStr] = parts;
-          const newProgress = parseInt(progressStr, 10);
-          if (!isNaN(newProgress) && newProgress >= 0 && newProgress <= 100) {
-            const projects = await getProjects();
-            const project = findProjectByName(projects, projectNameSearch);
-            if (project) {
-              const matchingPhase = project.phases.find(p => p.phase.toLowerCase().includes(phaseSearch.toLowerCase()));
-              if (matchingPhase) {
-                await executePhaseUpdate(db, collectionName, { projectName: project.name, projectId: project.projectId, phaseName: matchingPhase.phase, progress: newProgress }, commentStr || "", botToken, chatId);
-                return res.status(200).send("OK");
-              }
-            }
-          }
-        }
-      }
-
-      // INTERACTIVE WIZARD FLOW:
-      // Fetch ACTIVE projects
       const projects = await getProjects();
       const activeProjects = projects.filter((p) => p.health !== "completed");
 
@@ -533,7 +428,6 @@ ${phasesText}`;
       });
       projectButtons.push([{ text: "❌ Cancelar", callback_data: "cancel_wizard" }]);
 
-      // Save initial wizard session state
       await sessionRef(chatId).set({
         chatId: String(chatId),
         step: "SELECT_PROJECT",
@@ -543,7 +437,7 @@ ${phasesText}`;
       await sendTelegramMessage(
         botToken,
         chatId,
-        "📌 <b>¿Qué proyecto deseas actualizar?</b>\n<i>Selecciona uno de la lista a continuación:</i>",
+        "📌 <b>¿Qué proyecto deseas actualizar?</b>\n<i>Selecciona uno de la lista:</i>",
         { inline_keyboard: projectButtons }
       );
       return res.status(200).send("OK");
@@ -555,34 +449,6 @@ ${phasesText}`;
     const session = await getSession(chatId);
 
     if (session) {
-      // IF WAITING FOR PROGRESS NUMBER AS TEXT
-      if (session.step === "AWAITING_PROGRESS") {
-        const num = parseInt(text, 10);
-        if (isNaN(num) || num < 0 || num > 100) {
-          await sendTelegramMessage(botToken, chatId, "❌ El porcentaje debe ser un número entero entre 0 y 100. Inténtalo de nuevo:");
-          return res.status(200).send("OK");
-        }
-
-        await sessionRef(chatId).update({
-          step: "AWAITING_ACHIEVEMENTS",
-          progress: num,
-          updatedAt: Date.now(),
-        });
-
-        const skipButtons = [
-          [{ text: "💬 Omitir logros", callback_data: "skip_achievements" }],
-          [{ text: "❌ Cancelar", callback_data: "cancel_wizard" }],
-        ];
-
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          `📌 Proyecto: <b>${escapeHtml(session.projectName)}</b>\n🔹 Fase: <b>${escapeHtml(session.phaseName)}</b> (${num}%)\n\n🏆 <b>¿Qué lograron esta semana?</b>\n<i>(Escribe los hitos concretos en un mensaje, o presiona Omitir)</i>`,
-          { inline_keyboard: skipButtons }
-        );
-        return res.status(200).send("OK");
-      }
-
       // IF WAITING FOR ACHIEVEMENTS TEXT
       if (session.step === "AWAITING_ACHIEVEMENTS") {
         const achievements = (text.toLowerCase() === "omitir" || text.toLowerCase() === "nada") ? "Ninguno reportado" : text;
@@ -601,7 +467,7 @@ ${phasesText}`;
         await sendTelegramMessage(
           botToken,
           chatId,
-          `⚠️ <b>¿Qué los está frenando o bloqueando?</b>\n<i>(Falta de respuesta, problemas técnicos, etc. Escribe en un mensaje o presiona Ninguno)</i>`,
+          `⚠️ <b>¿Qué los está frenando o bloqueando?</b>\n<i>(Falta de respuesta, accesos pendientes, problemas técnicos, etc. O presiona "Ninguno")</i>`,
           { inline_keyboard: skipBlockButtons }
         );
         return res.status(200).send("OK");
@@ -610,7 +476,7 @@ ${phasesText}`;
       // IF WAITING FOR BLOCKERS TEXT
       if (session.step === "AWAITING_BLOCKERS") {
         const blockers = (text.toLowerCase() === "omitir" || text.toLowerCase() === "nada" || text.toLowerCase() === "ninguno") ? "Ninguno" : text;
-        await executePhaseUpdate(db, collectionName, session, blockers, botToken, chatId);
+        await executeProjectUpdate(db, collectionName, session, blockers, botToken, chatId);
         await clearSession(chatId);
         return res.status(200).send("OK");
       }
@@ -640,38 +506,29 @@ function getChileDateShort() {
 }
 
 /**
- * Execute the phase update in Firestore and send final confirmation
+ * Execute the project update in Firestore and send final confirmation
  */
-async function executePhaseUpdate(db, collectionName, session, blockersText, botToken, chatId) {
-  const { projectName, projectId, phaseName, progress, healthIndicator, achievements } = session;
+async function executeProjectUpdate(db, collectionName, session, blockersText, botToken, chatId) {
+  const { projectName, projectId, healthIndicator, achievements } = session;
 
   const snapshot = await db.collection(collectionName).get();
-  const phases = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  const matchingPhase = phases.find(
+  // Find all matching docs for this project (or the single project doc)
+  const matchingDocs = allDocs.filter(
     (p) =>
-      (p.projectId === projectId || (p.project || "").toLowerCase() === (projectName || "").toLowerCase()) &&
-      (p.phase || "").toLowerCase().includes((phaseName || "").toLowerCase())
+      p.projectId === projectId ||
+      (p.project || "").toLowerCase() === (projectName || "").toLowerCase() ||
+      (p.name || "").toLowerCase() === (projectName || "").toLowerCase()
   );
 
-  if (!matchingPhase) {
-    await sendTelegramMessage(botToken, chatId, "❌ Error al guardar: No se encontró la fase correspondiente en la base de datos.");
+  if (matchingDocs.length === 0) {
+    await sendTelegramMessage(botToken, chatId, "❌ Error al guardar: No se encontró el proyecto en la base de datos.");
     return;
   }
 
-  const updates = {
-    progress: progress,
-    lastModified: Date.now(),
-  };
-
-  if (progress === 100) updates.state = "Completado";
-  else if (progress === 0) updates.state = "No iniciado";
-  else updates.state = "En curso";
-
-  // Formatear el nuevo comentario estructurado
-  let addedEntry = "";
+  // Format new structured update log
   const todayStr = getChileDateShort();
-  
   let healthIcon = "";
   if (healthIndicator === "verde") healthIcon = "🟢 Bien";
   else if (healthIndicator === "amarillo") healthIcon = "🟡 Con Riesgos";
@@ -682,31 +539,28 @@ async function executePhaseUpdate(db, collectionName, session, blockersText, bot
   if (achievements && achievements !== "Ninguno reportado") commentParts.push(`Logros: ${achievements.trim()}`);
   if (blockersText && blockersText !== "Ninguno" && blockersText !== "") commentParts.push(`Bloqueos: ${blockersText.trim()}`);
 
-  // Fallback for simple direct pipeline updates that just send a comment
-  if (!healthIcon && !achievements && blockersText && blockersText !== "Ninguno") {
-      commentParts.push(blockersText.trim());
-  }
+  const addedEntry = `${todayStr}: ${commentParts.join(" | ")}`;
 
-  if (commentParts.length > 0) {
-    addedEntry = `${todayStr}: ${commentParts.join(" | ")}`;
-    const existingComment = (matchingPhase.comment || "").trim();
+  // Update docs in Firestore
+  const updatePromises = matchingDocs.map(async (docData) => {
+    const existingComment = (docData.comment || docData.comments || "").trim();
+    const newComment = existingComment.length > 0 ? `${existingComment}\n${addedEntry}` : addedEntry;
 
-    if (existingComment.length > 0) {
-      updates.comment = `${existingComment}\n${addedEntry}`;
-    } else {
-      updates.comment = addedEntry;
-    }
-  }
+    await db.collection(collectionName).doc(docData.id).update({
+      comment: newComment,
+      lastModified: Date.now(),
+    });
+  });
 
-  await db.collection(collectionName).doc(matchingPhase.id).update(updates);
+  await Promise.all(updatePromises);
 
   const confirmation = 
 `✅ <b>¡Proyecto Actualizado con Éxito!</b>
 
 📌 <b>Proyecto:</b> ${escapeHtml(projectName)}
-🔹 <b>Fase:</b> ${escapeHtml(phaseName)}
-📊 <b>Nuevo Progreso:</b> ${progress}%
-📝 <b>Registro:</b> ${escapeHtml(addedEntry || "Sin cambios reportados")}`;
+🚦 <b>Estado Reportado:</b> ${healthIcon || "🟢"}
+🏆 <b>Logros:</b> ${escapeHtml(achievements && achievements !== "Ninguno reportado" ? achievements : "Sin novedades")}
+⚠️ <b>Bloqueos:</b> ${escapeHtml(blockersText && blockersText !== "Ninguno" ? blockersText : "Ninguno")}`;
 
   await sendTelegramMessage(botToken, chatId, confirmation);
 }

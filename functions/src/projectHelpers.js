@@ -1,113 +1,157 @@
 /**
- * projectHelpers.js - Business logic for aggregating Firestore phases into projects
+ * projectHelpers.js - Business logic for aggregating and calculating project status & KPIs
  *
- * Firestore collection "phases" stores one document per project phase.
- * This module groups them into project-level objects identical to what
- * the frontend calculates in data.js, so the API response is consistent.
+ * Supports both modern single-cycle projects and legacy multi-phase projects.
+ * Calculates automatic calendar-based progress and health metrics.
  */
-
-const PHASE_ORDER = ["Levantamiento", "Desarrollo", "Testing/QA", "Entrega"];
 
 /**
- * Groups an array of phase documents (from Firestore) into project objects.
- * @param {Array} phases - Raw phase docs from Firestore
+ * Parse a date string in DD/MM/YYYY or YYYY-MM-DD format
+ */
+function parseDate(str) {
+  if (!str) return null;
+  if (str.includes("-")) {
+    const [y, m, d] = str.split("-");
+    if (!y || !m || !d) return null;
+    return new Date(+y, +m - 1, +d);
+  }
+  const [d, m, y] = str.split("/");
+  if (!d || !m || !y) return null;
+  return new Date(+y, +m - 1, +d);
+}
+
+/**
+ * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%)
+ */
+function calculateTimeProgress(startDateStr, deliveryDateStr) {
+  const start = parseDate(startDateStr);
+  const end = parseDate(deliveryDateStr);
+  if (!start || !end || end <= start) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (today < start) return 0;
+  if (today >= end) return 100;
+
+  const totalTime = end.getTime() - start.getTime();
+  const elapsedTime = today.getTime() - start.getTime();
+  return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+}
+
+/**
+ * Groups an array of raw documents from Firestore into unified project models.
+ * @param {Array} items - Raw docs from Firestore collection "phases"
  * @returns {Array} - Aggregated project objects
  */
-function groupPhasesIntoProjects(phases) {
+function groupPhasesIntoProjects(items) {
   const projectMap = new Map();
 
-  for (const phase of phases) {
-    if (phase.isArchived) continue;
+  for (const item of items) {
+    if (item.isArchived) continue;
 
-    const key = phase.projectId || phase.project;
+    const key = item.projectId || item.project || item.id;
     if (!projectMap.has(key)) {
       projectMap.set(key, {
-        projectId: phase.projectId || key,
-        name: phase.project,
-        client: phase.client || "General",
-        responsible: phase.responsible || "",
+        projectId: item.projectId || key,
+        name: (item.project || item.name || "").replace(/\s+/g, " ").trim(),
+        client: item.client || "General",
+        responsible: item.responsible || "",
+        startDate: item.startDate || "",
+        deliveryDate: item.deliveryDate || item.endDate || "",
+        state: item.state || "En curso",
+        inferredPhase: item.inferredPhase || "En curso",
+        comments: item.comments || item.comment || "",
         phases: [],
+        isSingleCycle: item.isSingleCycle || false,
       });
     }
-    projectMap.get(key).phases.push(phase);
+
+    const proj = projectMap.get(key);
+    proj.phases.push(item);
+
+    // Keep earliest start date and latest delivery date
+    if (item.startDate && (!proj.startDate || parseDate(item.startDate) < parseDate(proj.startDate))) {
+      proj.startDate = item.startDate;
+    }
+    if ((item.deliveryDate || item.endDate) && (!proj.deliveryDate || parseDate(item.deliveryDate || item.endDate) > parseDate(proj.deliveryDate))) {
+      proj.deliveryDate = item.deliveryDate || item.endDate;
+    }
+    if (item.responsible && !proj.responsible) {
+      proj.responsible = item.responsible;
+    }
   }
 
   const projects = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   for (const proj of projectMap.values()) {
-    // Sort phases in standard order
-    proj.phases.sort(
-      (a, b) => PHASE_ORDER.indexOf(a.phase) - PHASE_ORDER.indexOf(b.phase)
-    );
+    const isCompleted = proj.state === "Completado" || proj.state === "Finalizado" || 
+      (proj.phases.length > 0 && proj.phases.every(p => p.state === "Completado" || p.state === "Finalizado"));
 
-    // Delivery date = endDate of last phase (Entrega)
-    const entregaPhase = proj.phases.find((p) => p.phase === "Entrega");
-    const deliveryDate = entregaPhase?.endDate || "";
+    // Calculate automatic time-based progress
+    let overallProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
+    if (isCompleted) {
+      overallProgress = 100;
+    }
 
-    // Overall progress = average of all phase progresses
-    const totalProgress =
-      proj.phases.reduce((sum, p) => sum + (p.progress || 0), 0) /
-      proj.phases.length;
-    const overallProgress = Math.round(totalProgress);
-
-    // Health calculation
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // Health & Status determination
     let health = "on_track";
     let healthLabel = "A tiempo";
-    let status = "En curso";
+    let status = isCompleted ? "Completado" : "En curso";
 
-    const allCompleted = proj.phases.every(
-      (p) => p.state === "Completado" || p.progress === 100
-    );
-    if (allCompleted) {
+    const deliveryEnd = parseDate(proj.deliveryDate);
+
+    if (isCompleted) {
       health = "completed";
       healthLabel = "Completado";
-      status = "Completado";
-    } else {
-      // Check if delivery phase is overdue
-      if (entregaPhase && entregaPhase.state !== "Completado") {
-        const deliveryEnd = parseDate(entregaPhase.endDate);
-        if (deliveryEnd && today > deliveryEnd) {
-          health = "delayed";
-          healthLabel = "Retrasado";
-          status = "Retrasado";
-        }
-      }
+    } else if (deliveryEnd && today > deliveryEnd) {
+      health = "delayed";
+      healthLabel = "Retrasado";
+      status = "Retrasado";
+    } else if (deliveryEnd) {
+      const diffTime = deliveryEnd.getTime() - today.getTime();
+      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // Check intermediate phases for risk
-      if (health === "on_track") {
-        for (const phase of proj.phases) {
-          if (phase.phase === "Entrega") continue;
-          if (phase.state === "Completado") continue;
-          const end = parseDate(phase.endDate);
-          if (end && today > end && phase.state !== "Completado") {
-            health = "at_risk";
-            healthLabel = "En Riesgo";
-            status = "En Riesgo";
-            break;
-          }
-        }
+      // If less than 7 days remaining and time progress > 80% with blockers
+      const allComments = proj.phases.map(p => p.comment || "").join(" ") + " " + (typeof proj.comments === "string" ? proj.comments : "");
+      if (allComments.includes("🔴") || allComments.toLowerCase().includes("bloqueado")) {
+        health = "at_risk";
+        healthLabel = "En Riesgo";
+        status = "En Riesgo";
+      } else if (daysRemaining <= 7 && overallProgress < 70) {
+        health = "at_risk";
+        healthLabel = "En Riesgo";
+        status = "En Riesgo";
       }
     }
+
+    // Combine comments history into chronological view
+    const combinedComments = proj.phases
+      .map(p => p.comment)
+      .filter(Boolean)
+      .join("\n");
 
     projects.push({
       projectId: proj.projectId,
       name: proj.name,
       client: proj.client,
       responsible: proj.responsible,
+      startDate: proj.startDate,
+      deliveryDate: proj.deliveryDate,
       status,
       health,
       healthLabel,
       overallProgress,
-      deliveryDate,
-      phases: proj.phases.map((p) => ({
-        phase: p.phase,
-        state: p.state,
-        progress: p.progress || 0,
-        startDate: p.startDate || "",
-        endDate: p.endDate || "",
+      inferredPhase: proj.inferredPhase || (isCompleted ? "Completado" : "En curso"),
+      comment: combinedComments || (typeof proj.comments === "string" ? proj.comments : ""),
+      phases: proj.phases.map(p => ({
+        phase: p.phase || "Ciclo Principal",
+        state: p.state || "En curso",
+        progress: p.progress !== undefined ? p.progress : overallProgress,
+        startDate: p.startDate || proj.startDate,
+        endDate: p.endDate || proj.deliveryDate,
         comment: p.comment || "",
         id: p.id,
       })),
@@ -118,24 +162,12 @@ function groupPhasesIntoProjects(phases) {
 }
 
 /**
- * Parse a date string in DD/MM/YYYY format
- */
-function parseDate(str) {
-  if (!str) return null;
-  const [d, m, y] = str.split("/");
-  if (!d || !m || !y) return null;
-  return new Date(+y, +m - 1, +d);
-}
-
-/**
  * Find a project by approximate name match (case-insensitive, partial)
  */
 function findProjectByName(projects, searchName) {
   const q = searchName.toLowerCase().trim();
-  // Exact match first
   let found = projects.find((p) => p.name.toLowerCase() === q);
   if (found) return found;
-  // Partial match
   found = projects.find((p) => p.name.toLowerCase().includes(q));
   return found || null;
 }
@@ -149,8 +181,7 @@ function computeSummary(projects) {
   const delayed = projects.filter((p) => p.health === "delayed").length;
   const atRisk = projects.filter((p) => p.health === "at_risk").length;
   const onTrack = projects.filter((p) => p.health === "on_track").length;
-  const sla =
-    total > 0 ? Math.round(((total - delayed) / total) * 100) : 100;
+  const sla = total > 0 ? Math.round(((total - delayed) / total) * 100) : 100;
   const criticalProjects = projects
     .filter((p) => p.health === "delayed" || p.health === "at_risk")
     .map((p) => p.name);
@@ -158,4 +189,10 @@ function computeSummary(projects) {
   return { total, completed, onTrack, atRisk, delayed, sla, criticalProjects };
 }
 
-module.exports = { groupPhasesIntoProjects, findProjectByName, computeSummary };
+module.exports = {
+  parseDate,
+  calculateTimeProgress,
+  groupPhasesIntoProjects,
+  findProjectByName,
+  computeSummary,
+};

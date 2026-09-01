@@ -18,57 +18,39 @@ const ROLES_COLLECTION = "userRoles";
 const LOGS_COLLECTION = "audit_logs";
 const USERS_COLLECTION = "userRoles"; // same collection, users are identified by uid
 
-// // Initial data to seed Firestore if collection is empty
-// export const initialData = [
-//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '16/03/2026', endDate: '18/03/2026', state: 'En curso', progress: 0, comment: '' },
-//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '19/03/2026', endDate: '24/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '25/03/2026', endDate: '26/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Carga Subsidios/Aportes', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '27/03/2026', endDate: '27/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '30/03/2026', endDate: '01/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '02/04/2026', endDate: '07/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '08/04/2026', endDate: '09/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Gestión BBDD (ME2L PAD)', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '10/04/2026', endDate: '10/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Levantamiento', startDate: '13/04/2026', endDate: '15/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Desarrollo', startDate: '16/04/2026', endDate: '21/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Testing/QA', startDate: '22/04/2026', endDate: '23/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Proyecciones Masa', client: 'Nexus', responsible: 'Javiera Contador', phase: 'Entrega', startDate: '24/04/2026', endDate: '24/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '23/03/2026', endDate: '25/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '26/03/2026', endDate: '31/03/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '01/04/2026', endDate: '02/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Algoritmo EECC', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '03/04/2026', endDate: '03/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '06/04/2026', endDate: '08/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '09/04/2026', endDate: '14/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '15/04/2026', endDate: '16/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reportes a Externos', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '17/04/2026', endDate: '17/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Levantamiento', startDate: '20/04/2026', endDate: '22/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Desarrollo', startDate: '23/04/2026', endDate: '28/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Testing/QA', startDate: '29/04/2026', endDate: '30/04/2026', state: 'No iniciado', progress: 0, comment: '' },
-//   { project: 'Reporte Gestión/Bench.', client: 'Nexus', responsible: 'Felipe Toro', phase: 'Entrega', startDate: '01/05/2026', endDate: '01/05/2026', state: 'No iniciado', progress: 0, comment: '' }
-// ];
+/**
+ * Parse a date string in DD/MM/YYYY or YYYY-MM-DD format
+ */
+export function parseDate(str) {
+  if (!str) return null;
+  if (str.includes("-")) {
+    const [y, m, d] = str.split("-");
+    if (!y || !m || !d) return null;
+    return new Date(+y, +m - 1, +d);
+  }
+  const [d, m, y] = str.split("/");
+  if (!d || !m || !y) return null;
+  return new Date(+y, +m - 1, +d);
+}
 
-// /**
-//  * Seeds Firestore with the initial data if the collection is empty.
-//  */
-// export async function seedInitialDataIfEmpty(db) {
-//   const colRef = collection(db, COLLECTION);
-//   const snapshot = await getDocs(colRef);
+/**
+ * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%)
+ */
+export function calculateTimeProgress(startDateStr, deliveryDateStr) {
+  const start = parseDate(startDateStr);
+  const end = parseDate(deliveryDateStr);
+  if (!start || !end || end <= start) return 0;
 
-//   if (!snapshot.empty) return; // Already seeded
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-//   const promises = initialData.map(item => {
-//     const projectId = item.project.toLowerCase().replace(/[^a-z0-9]/gi, '-');
-//     const id = `${item.project}-${item.phase}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-//     return setDoc(doc(db, COLLECTION, id), { ...item, id, projectId });
-//   });
+  if (today < start) return 0;
+  if (today >= end) return 100;
 
-//   await Promise.all(promises);
-
-//   // Seed initial client
-//   const clientRef = doc(db, CLIENTS_COLLECTION, "mutual");
-//   await setDoc(clientRef, { name: "Mutual", id: "mutual", createdAt: Date.now() });
-
-//   console.log("Firestore seeded with initial data and Mutual client.");
-// }
+  const totalTime = end.getTime() - start.getTime();
+  const elapsedTime = today.getTime() - start.getTime();
+  return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+}
 
 /**
  * Subscribes to real-time Firestore updates.
@@ -77,7 +59,7 @@ const USERS_COLLECTION = "userRoles"; // same collection, users are identified b
 export function subscribeToPhases(db, callback) {
   const colRef = collection(db, COLLECTION);
   return onSnapshot(colRef, (snapshot) => {
-    const phases = snapshot.docs.map(d => d.data());
+    const phases = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     callback(phases);
   });
 }
@@ -86,7 +68,6 @@ export function subscribeToClients(db, callback) {
   const colRef = collection(db, CLIENTS_COLLECTION);
   return onSnapshot(colRef, (snapshot) => {
     const clients = snapshot.docs.map(d => d.data());
-    // Sort by creation or name
     clients.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     callback(clients);
   });
@@ -107,11 +88,8 @@ export function subscribeToLogs(db, callback) {
   });
 }
 
-
-
-
 /**
- * Updates a single phase document in Firestore.
+ * Updates a single project or phase document in Firestore.
  */
 export async function updatePhase(db, phaseId, updates) {
   const phaseRef = doc(db, COLLECTION, phaseId);
@@ -119,36 +97,34 @@ export async function updatePhase(db, phaseId, updates) {
 }
 
 /**
- * Creates a new project with 4 default phases in Firestore.
+ * Creates a new project in Firestore (Single-Cycle Architecture).
  */
-export async function createNewProject(db, projectName, clientName = 'General', phases = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega']) {
+export async function createNewProject(db, projectName, clientName = 'General', responsible = '', startDate = '', deliveryDate = '') {
   const timestamp = Date.now();
-  const selectedPhases = (phases && phases.length > 0) ? phases : ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega'];
-
   const projectId = `proj-${timestamp}`;
+  const id = `${projectName}-${timestamp}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
 
-  const promises = selectedPhases.map(phaseName => {
-    // Unique ID for each phase using timestamp to avoid collisions
-    const id = `${projectName}-${phaseName}-${timestamp}`.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const phaseData = {
-      id,
-      projectId,
-      project: projectName,
-      client: clientName,
-      phase: phaseName,
-      responsible: '',
-      startDate: '',
-      endDate: '',
-      state: 'No iniciado',
-      progress: 0,
-      comment: '',
-      isArchived: false,
-      lastModified: timestamp
-    };
-    return setDoc(doc(db, COLLECTION, id), phaseData);
-  });
+  const projectData = {
+    id,
+    projectId,
+    project: projectName,
+    name: projectName,
+    client: clientName,
+    phase: 'Ciclo Principal',
+    responsible: responsible || '',
+    startDate: startDate || '',
+    deliveryDate: deliveryDate || '',
+    endDate: deliveryDate || '',
+    state: 'En curso',
+    progress: 0,
+    comment: '',
+    inferredPhase: 'Levantamiento',
+    isSingleCycle: true,
+    isArchived: false,
+    lastModified: timestamp
+  };
 
-  await Promise.all(promises);
+  await setDoc(doc(db, COLLECTION, id), projectData);
 }
 
 /**
@@ -170,175 +146,186 @@ export async function createAuditLog(db, user, action, projectDetails) {
 }
 
 /**
- * Updates project-wide metadata (name or responsible) across all its phases.
+ * Updates project-wide metadata (name, responsible, client, dates) across its documents.
  */
-export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient) {
+export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient, startDate, deliveryDate, state, inferredPhase) {
   const finalNewName = (newName || '').replace(/\s+/g, ' ').trim();
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
-  const phasesToUpdate = snapshot.docs
-    .map(d => d.data())
-    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId)); // Fallback for legacy
+  const docsToUpdate = snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
 
-  const promises = phasesToUpdate.map(phase => {
-    const phaseRef = doc(db, COLLECTION, phase.id);
+  const promises = docsToUpdate.map(item => {
+    const docRef = doc(db, COLLECTION, item.id);
     const updates = {
       project: finalNewName,
-      responsible: newResponsible,
+      name: finalNewName,
       lastModified: Date.now()
     };
-    if (newClient !== undefined) {
-      updates.client = newClient;
+    if (newResponsible !== undefined) updates.responsible = newResponsible;
+    if (newClient !== undefined) updates.client = newClient;
+    if (startDate !== undefined) updates.startDate = startDate;
+    if (deliveryDate !== undefined) {
+      updates.deliveryDate = deliveryDate;
+      updates.endDate = deliveryDate;
     }
-    return updateDoc(phaseRef, updates);
+    if (state !== undefined) updates.state = state;
+    if (inferredPhase !== undefined) updates.inferredPhase = inferredPhase;
+
+    return updateDoc(docRef, updates);
   });
 
   await Promise.all(promises);
 }
 
 /**
- * Soft-deletes a project by marking all its phases as archived.
+ * Soft-deletes a project by marking its documents as archived.
  */
 export async function archiveProject(db, projectId, user) {
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
-  const phasesToUpdate = snapshot.docs
+  const docsToUpdate = snapshot.docs
     .filter(d => {
       const data = d.data();
-      return data.projectId === projectId || (data.project === projectId && !data.projectId);
+      return data.projectId === projectId || (data.project === projectId && !data.projectId) || d.id === projectId;
     });
 
-  if (phasesToUpdate.length > 0) {
-    const projData = phasesToUpdate[0].data();
+  if (docsToUpdate.length > 0) {
+    const projData = docsToUpdate[0].data();
     await createAuditLog(db, user, 'ARCHIVE', {
       id: projectId,
-      name: projData.project,
+      name: projData.project || projData.name,
       client: projData.client
     });
   }
 
-  const promises = phasesToUpdate.map(d => updateDoc(d.ref, { isArchived: true, lastModified: Date.now() }));
+  const promises = docsToUpdate.map(d => updateDoc(d.ref, { isArchived: true, lastModified: Date.now() }));
   await Promise.all(promises);
 }
 
 /**
- * Restores a soft-deleted project by removing the archived mark from its phases.
+ * Restores a soft-deleted project by removing the archived mark.
  */
 export async function restoreProject(db, projectId, user) {
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
-  const phasesToUpdate = snapshot.docs
+  const docsToUpdate = snapshot.docs
     .filter(d => {
       const data = d.data();
-      return data.projectId === projectId || (data.project === projectId && !data.projectId);
+      return data.projectId === projectId || (data.project === projectId && !data.projectId) || d.id === projectId;
     });
 
-  if (phasesToUpdate.length > 0) {
-    const projData = phasesToUpdate[0].data();
+  if (docsToUpdate.length > 0) {
+    const projData = docsToUpdate[0].data();
     await createAuditLog(db, user, 'RESTORE', {
       id: projectId,
-      name: projData.project,
+      name: projData.project || projData.name,
       client: projData.client
     });
   }
 
-  const promises = phasesToUpdate.map(d => updateDoc(d.ref, { isArchived: false, lastModified: Date.now() }));
+  const promises = docsToUpdate.map(d => updateDoc(d.ref, { isArchived: false, lastModified: Date.now() }));
   await Promise.all(promises);
 }
 
 /**
- * Permanently deletes a project by removing all its phase documents from Firestore.
+ * Permanently deletes a project by removing all its documents from Firestore.
  */
 export async function deleteProjectPermanently(db, projectId, user) {
   console.log("data.js: Iniciando eliminación física de:", projectId);
   const colRef = collection(db, COLLECTION);
-  // Try to query by projectId first
   const q = query(colRef, where("projectId", "==", projectId));
   let snapshot = await getDocs(q);
 
   if (snapshot.empty) {
-    // Fallback for legacy projects where the name was used as ID
     const qLegacy = query(colRef, where("project", "==", projectId));
     snapshot = await getDocs(qLegacy);
   }
 
   if (snapshot.empty) {
-    console.warn("data.js: No se encontraron fases para el proyecto:", projectId);
+    console.warn("data.js: No se encontraron documentos para el proyecto:", projectId);
     return;
   }
 
   const projData = snapshot.docs[0].data();
   await createAuditLog(db, user, 'DELETE_PERMANENT', {
     id: projectId,
-    name: projData.project,
+    name: projData.project || projData.name,
     client: projData.client
   });
 
-  console.log(`data.js: Borrando ${snapshot.size} documentos...`);
   const promises = snapshot.docs.map(d => deleteDoc(d.ref));
   await Promise.all(promises);
   console.log("data.js: Borrado completado.");
 }
 
 /**
- * Aggregates raw phases into grouped project view models.
+ * Aggregates raw phases / project documents into unified view models.
+ * Calculates automatic calendar-based progress and health metrics.
  */
 export function aggregateProjectData(phases) {
   const projects = {};
 
   phases.forEach(item => {
-    // Robust grouping using projectId if available, fallback to normalized project name
-    const groupingKey = item.projectId || (item.project || '').replace(/\s+/g, ' ').trim();
+    const groupingKey = item.projectId || (item.project || item.name || '').replace(/\s+/g, ' ').trim();
 
     if (!projects[groupingKey]) {
       projects[groupingKey] = {
         id: groupingKey,
-        name: (item.project || '').replace(/\s+/g, ' ').trim(),
+        name: (item.project || item.name || '').replace(/\s+/g, ' ').trim(),
         client: item.client || 'General',
-        responsible: item.responsible,
+        responsible: item.responsible || '',
+        startDate: item.startDate || '',
+        deliveryDate: item.deliveryDate || item.endDate || '',
+        state: item.state || 'En curso',
+        inferredPhase: item.inferredPhase || '',
         phases: [],
         overallProgress: 0,
-        status: 'No iniciado'
+        status: 'En curso',
+        isSingleCycle: item.isSingleCycle || false,
+        comments: item.comments || item.comment || ''
       };
     }
-    projects[groupingKey].phases.push(item);
+
+    const proj = projects[groupingKey];
+    proj.phases.push(item);
+
+    if (item.startDate && (!proj.startDate || parseDate(item.startDate) < parseDate(proj.startDate))) {
+      proj.startDate = item.startDate;
+    }
+    if ((item.deliveryDate || item.endDate) && (!proj.deliveryDate || parseDate(item.deliveryDate || item.endDate) > parseDate(proj.deliveryDate))) {
+      proj.deliveryDate = item.deliveryDate || item.endDate;
+    }
+    if (item.responsible && !proj.responsible) {
+      proj.responsible = item.responsible;
+    }
+    if (item.inferredPhase) {
+      proj.inferredPhase = item.inferredPhase;
+    }
   });
 
-  // Sort phases in logical order
-  const phaseOrder = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega'];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   Object.values(projects).forEach(proj => {
+    const phaseOrder = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega', 'Ciclo Principal'];
     proj.phases.sort((a, b) => phaseOrder.indexOf(a.phase) - phaseOrder.indexOf(b.phase));
 
-    const totalProgress = proj.phases.reduce((sum, p) => sum + (p.progress || 0), 0);
-    proj.overallProgress = Math.round(totalProgress / proj.phases.length);
+    const isCompleted = proj.state === 'Completado' || proj.state === 'Finalizado' ||
+      (proj.phases.length > 0 && proj.phases.every(p => p.state === 'Finalizado' || p.state === 'Completado'));
 
-    const allDone = proj.phases.every(p => p.state === 'Finalizado') && proj.overallProgress === 100;
-    const anyStarted = proj.phases.some(p => p.state === 'En curso' || p.state === 'Finalizado');
-
-    if (allDone) {
+    // Automatic time-based progress
+    let overallProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
+    if (isCompleted) {
+      overallProgress = 100;
       proj.status = 'Completado';
-    } else if (anyStarted || proj.overallProgress > 0) {
-      proj.status = 'En curso';
     } else {
-      proj.status = 'No iniciado';
+      proj.status = 'En curso';
     }
+    proj.overallProgress = overallProgress;
 
-    // Calculate dates & executive health
-    const parseLocalDDMMYYYY = (str) => {
-      if (!str) return null;
-      const [d, m, y] = str.split('/');
-      return new Date(+y, +m - 1, +d);
-    };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const entregaPhase = proj.phases.find(p => p.phase === 'Entrega') || proj.phases[proj.phases.length - 1];
-    proj.deliveryDate = entregaPhase ? entregaPhase.endDate : '';
-    proj.startDate = proj.phases[0] ? proj.phases[0].startDate : '';
-
-    // Calculate days remaining to delivery
-    const deliveryDateObj = parseLocalDDMMYYYY(proj.deliveryDate);
+    const deliveryDateObj = parseDate(proj.deliveryDate);
     if (deliveryDateObj) {
       const diffTime = deliveryDateObj.getTime() - today.getTime();
       proj.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -346,41 +333,23 @@ export function aggregateProjectData(phases) {
       proj.daysRemaining = null;
     }
 
-    // Determine current active phase
-    const inProgressPhase = proj.phases.find(p => p.state === 'En curso');
-    const notStartedPhase = proj.phases.find(p => p.state === 'No iniciado');
-    proj.currentPhase = inProgressPhase ? inProgressPhase.phase : (notStartedPhase ? notStartedPhase.phase : 'Entrega');
-
-    // Calculate Executive Health: 'completed' | 'delayed' | 'at_risk' | 'on_track'
-    if (proj.status === 'Completado') {
+    // Health calculation
+    if (isCompleted) {
       proj.health = 'completed';
       proj.healthLabel = 'Completado';
     } else {
       let isDelayed = false;
       let isAtRisk = false;
 
-      // Retrasado: ONLY when the entrega phase / project delivery date has passed without being completed
-      const entregaEnd = entregaPhase ? parseLocalDDMMYYYY(entregaPhase.endDate) : deliveryDateObj;
-      if (entregaEnd && entregaEnd < today && (!entregaPhase || entregaPhase.state !== 'Finalizado')) {
+      if (deliveryDateObj && deliveryDateObj < today) {
         isDelayed = true;
       }
 
-      // En Riesgo: intermediate phases overdue, delayed start, or delivery near with low progress
-      if (!isDelayed) {
-        proj.phases.forEach(p => {
-          const pEnd = parseLocalDDMMYYYY(p.endDate);
-          const pStart = parseLocalDDMMYYYY(p.startDate);
-          if (pEnd && pEnd < today && p.state !== 'Finalizado') {
-            isAtRisk = true;
-          }
-          if (pStart && pStart < today && p.state === 'No iniciado') {
-            isAtRisk = true;
-          }
-        });
-
-        if (proj.daysRemaining !== null && proj.daysRemaining <= 7 && proj.overallProgress < 75) {
-          isAtRisk = true;
-        }
+      const allComments = proj.phases.map(p => p.comment || '').join(' ') + ' ' + (proj.comments || '');
+      if (allComments.includes('🔴') || allComments.toLowerCase().includes('bloqueado')) {
+        isAtRisk = true;
+      } else if (proj.daysRemaining !== null && proj.daysRemaining <= 7 && overallProgress < 75) {
+        isAtRisk = true;
       }
 
       if (isDelayed) {
@@ -395,11 +364,13 @@ export function aggregateProjectData(phases) {
       }
     }
 
-    // Determine if the project is archived (if any phase is marked as archived)
-    proj.isArchived = proj.phases.some(p => p.isArchived === true);
+    if (!proj.inferredPhase) {
+      proj.inferredPhase = isCompleted ? 'Completado' : 'En curso';
+    }
+    proj.currentPhase = proj.inferredPhase;
 
-    // Track when project was last modified (max across all phases)
-    proj.lastModified = Math.max(...proj.phases.map(p => p.lastModified || 0));
+    proj.isArchived = proj.phases.some(p => p.isArchived === true);
+    proj.lastModified = Math.max(...proj.phases.map(p => p.lastModified || 0), proj.lastModified || 0);
   });
 
   return Object.values(projects);
@@ -407,7 +378,6 @@ export function aggregateProjectData(phases) {
 
 /**
  * Retrieves the user's role and profile from Firestore.
- * Returns an object: { role, allowedClients, displayName, email }
  */
 export async function getUserRole(db, uid) {
   try {
@@ -426,7 +396,6 @@ export async function getUserRole(db, uid) {
 
 /**
  * Retrieves full user profile from Firestore.
- * Returns: { uid, role, allowedClients, displayName, email }
  */
 export async function getUserProfile(db, uid) {
   try {
@@ -455,9 +424,7 @@ export function subscribeToUsers(db, callback) {
 }
 
 /**
- * Creates or updates a user profile in Firestore (does NOT create the Firebase Auth account).
- * The Admin must create the Auth account separately via Firebase Console or Admin SDK.
- * This stores the role/permissions for an existing UID.
+ * Creates or updates a user profile in Firestore.
  */
 export async function saveUserProfile(db, uid, { email, displayName, role, allowedClients }) {
   const userRef = doc(db, USERS_COLLECTION, uid);
@@ -472,7 +439,7 @@ export async function saveUserProfile(db, uid, { email, displayName, role, allow
 }
 
 /**
- * Deletes a user profile from Firestore (does NOT delete the Firebase Auth account).
+ * Deletes a user profile from Firestore.
  */
 export async function deleteUserProfile(db, uid) {
   const userRef = doc(db, USERS_COLLECTION, uid);

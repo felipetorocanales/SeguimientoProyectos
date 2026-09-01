@@ -120,6 +120,16 @@ function adjustToWeekday(date, direction = 1) {
   return d;
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Loading state
 function showLoading() {
   projectsListEl.innerHTML = `
@@ -1194,111 +1204,136 @@ function renderProjectCard(proj, index, isArchived) {
   const canEdit = role === 'editor' || role === 'admin';
   const canDelete = role === 'admin';
 
+  // Format health badge
+  let healthBadge = `<span class="exec-pill exec-pill-green">🟢 ${proj.healthLabel || 'A Tiempo'}</span>`;
+  if (proj.health === 'at_risk') healthBadge = `<span class="exec-pill exec-pill-yellow">🟡 ${proj.healthLabel || 'En Riesgo'}</span>`;
+  if (proj.health === 'delayed') healthBadge = `<span class="exec-pill exec-pill-coral">🚨 ${proj.healthLabel || 'Retrasado'}</span>`;
+  if (proj.health === 'completed') healthBadge = `<span class="exec-pill exec-pill-blue">✅ ${proj.healthLabel || 'Completado'}</span>`;
+
+  // Get all comments text
+  const rawComments = (proj.phases.map(p => p.comment).filter(Boolean).join('\n') || proj.comment || proj.comments || '').trim();
+  const commentLines = rawComments ? rawComments.split('\n').filter(Boolean) : [];
+
+  const mainPhaseId = (proj.phases[0] && proj.phases[0].id) || proj.id;
+
   return `
-  <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s">
+  <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s; margin-bottom: 1.5rem; padding: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-      <div>
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
+      <div style="flex: 1; min-width: 280px;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
           <h3 ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.id}', 'name')"` : ''}
               onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
-              style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0; min-width: 100px;">${proj.name}</h3>
-          <span class="badge ${getStatusClass(proj.status)}">${proj.status}</span>
+              style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0; min-width: 100px; color: #f8fafc;">${proj.name}</h3>
+          
+          <span class="exec-pill exec-pill-purple" style="font-size: 0.75rem; font-weight: 600;">
+            🎯 Etapa IA: ${proj.inferredPhase || 'Levantamiento'}
+          </span>
+          ${healthBadge}
         </div>
-        <div style="display: flex; align-items: center; gap: 1rem; color: var(--text-muted); font-size: 0.875rem; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+
+        <div style="display: flex; align-items: center; gap: 1.25rem; color: var(--text-muted); font-size: 0.85rem; flex-wrap: wrap; margin-top: 0.35rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
             <span ${canEdit && !isArchived ? `class="editable-field" contenteditable="true" onblur="window.handleMetaBlur(this, '${proj.id}', 'responsible')"` : ''}
                   onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
-                  style="min-width: 80px;">${proj.responsible || 'Sin asignar'}</span>
+                  style="min-width: 80px; color: #cbd5e1;">${proj.responsible || 'Sin asignar'}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-          ${canEdit && !isArchived ? `
-              <select class="editable-field" style="background: transparent; border: none; color: inherit; cursor: pointer; padding: 0; outline: none; appearance: none; -webkit-appearance: none; font-family: inherit; font-size: inherit;" onchange="window.handleClientChange('${proj.id}', this.value)">
+
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            ${canEdit && !isArchived ? `
+              <select class="editable-field" style="background: transparent; border: none; color: #cbd5e1; cursor: pointer; padding: 0; outline: none;" onchange="window.handleClientChange('${proj.id}', this.value)">
                 ${appState.clients.map(c => `<option value="${c.name}" ${c.name === proj.client ? 'selected' : ''} style="background: var(--bg-color); color: var(--text-main);">${c.name}</option>`).join('')}
               </select>
             ` : `
-              <span>${proj.client || 'General'}</span>
+              <span style="color: #cbd5e1;">${proj.client || 'General'}</span>
             `}
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.4rem; color: #38bdf8;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>${proj.startDate || '—'} → ${proj.deliveryDate || '—'}</span>
           </div>
         </div>
       </div>
 
+      <!-- Actions & Global Time Progress -->
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
-        ${canEdit
-          ? (!isArchived
-              ? `<button class="archive-btn js-archive-project" 
-                        data-project-id="${proj.id}"
-                        data-project-name="${proj.name}"
-                        title="Archivar Proyecto">Archivar</button>`
-              : `
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
-                  <button class="restore-btn js-restore-project" 
-                          data-project-id="${proj.id}"
-                          data-project-name="${proj.name}"
-                          title="Restaurar Proyecto">Restaurar</button>
-                  ${canDelete ? `
-                  <button class="delete-btn js-delete-permanent" 
-                          data-project-id="${proj.id}"
-                          data-project-name="${proj.name}"
-                          style="background: var(--status-alert); padding: 0.25rem 0.5rem; font-size: 0.7rem;" 
-                          title="Eliminar para siempre">Borrar Permanentemente</button>
-                  ` : ''}
-                </div>
-              `)
-          : ''
-        }
-        <span style="font-size: 1.125rem; font-weight: 700; color: var(--accent-tertiary);">${proj.overallProgress}% Global</span>
-      </div>
-      </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          ${canEdit && !isArchived ? `
+            <button class="primary" style="font-size: 0.78rem; padding: 0.35rem 0.8rem; display: flex; align-items: center; gap: 0.4rem;" onclick="window.openEditModal('${mainPhaseId}')">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              Editar Fechas / Estado
+            </button>
+          ` : ''}
 
-      <div class="progress-container" style="margin-bottom: 1.5rem; height: 6px;">
-        <div class="progress-bar" style="width: ${proj.overallProgress}%;"></div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
-        ${proj.phases.map(phase => `
-          <div class="phase-card"
-               style="background: rgba(0,0,0,0.2); border-radius: var(--border-radius-sm); padding: 1rem; border: 1px solid transparent; transition: border-color 0.2s, box-shadow 0.2s; cursor: ${canEdit ? 'pointer' : 'default'}; display: flex; flex-direction: column; height: 220px;"
-               ${canEdit ? `onclick="window.openEditModal('${phase.id}')"` : ''}>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-              <strong style="font-size: 0.9rem;">${phase.phase}</strong>
-              <span class="badge ${getStatusClass(phase.state)}" style="font-size: 0.65rem; padding: 0.1rem 0.5rem;">${phase.state}</span>
+          ${canEdit ? (!isArchived ? `
+            <button class="archive-btn js-archive-project" data-project-id="${proj.id}" data-project-name="${proj.name}" title="Archivar Proyecto" style="font-size:0.75rem; padding: 0.35rem 0.7rem;">Archivar</button>
+          ` : `
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="restore-btn js-restore-project" data-project-id="${proj.id}" data-project-name="${proj.name}" title="Restaurar Proyecto">Restaurar</button>
+              ${canDelete ? `<button class="delete-btn js-delete-permanent" data-project-id="${proj.id}" data-project-name="${proj.name}" style="background: var(--status-alert); padding: 0.25rem 0.5rem; font-size: 0.7rem;">Borrar</button>` : ''}
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-              <span>${phase.startDate} – ${phase.endDate}</span>
-              <span style="color: white; font-weight: bold;">${phase.progress || 0}%</span>
-            </div>
-            <div class="progress-container" style="height: 4px; margin-top: 0; background: rgba(255,255,255,0.1); flex-shrink: 0;">
-              <div class="progress-bar" style="width: ${phase.progress || 0}%; background: ${(phase.progress || 0) === 100 ? 'var(--status-done)' : 'var(--accent-primary)'}"></div>
-            </div>
-            ${phase.comment ? `
-              <div class="phase-comment custom-scrollbar" style="margin-top: 0.75rem; font-size: 0.8rem; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px; border-left: 2px solid var(--accent-secondary); white-space: pre-wrap; flex-grow: 1; overflow-y: auto;">${phase.comment}</div>
-            ` : ''}
-          </div>
-        `).join('')}
+          `) : ''}
+        </div>
+
+        <div style="text-align: right;">
+          <span style="font-size: 1.15rem; font-weight: 800; color: #38bdf8;">${proj.overallProgress}%</span>
+          <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: 0.3rem;">Tiempo Transcurrido</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar Progress Bar -->
+    <div class="progress-container" style="margin: 0.75rem 0 1.25rem; height: 7px; background: rgba(255,255,255,0.08);">
+      <div class="progress-bar" style="width: ${proj.overallProgress}%; background: ${proj.health === 'completed' ? 'var(--status-done)' : (proj.health === 'delayed' ? 'var(--exec-soft-coral)' : (proj.health === 'at_risk' ? '#f59e0b' : 'linear-gradient(90deg, #38bdf8, #6366f1)'))};"></div>
+    </div>
+
+    <!-- Feed / Historial de Actualizaciones -->
+    <div style="background: rgba(3, 11, 30, 0.5); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.15); padding: 1rem; margin-top: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4rem;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+          Historial de Actualizaciones (${commentLines.length})
+        </span>
       </div>
 
-      <!-- Chevron toggle for mini Gantt -->
-      <div style="display:flex; justify-content:center; margin-top:1.25rem; padding-top:0.75rem; border-top:1px solid var(--card-border);">
-        <button
-          id="gantt-toggle-${safeId}"
-          onclick="window.toggleProjectGantt('${safeId}')"
-          style="background:transparent; border:none; color:${isExpanded ? 'var(--accent-primary)' : 'var(--text-muted)'}; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.25rem 1rem; transition:color 0.2s;"
-          title="Ver cronograma por fases"
-        >
-          <span style="font-size:0.7rem; letter-spacing:0.05em; text-transform:uppercase;">Cronograma</span>
-          <svg id="gantt-chevron-${safeId}" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="transition:transform 0.3s; transform: ${isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
+      <div style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;" class="custom-scrollbar">
+        ${commentLines.length > 0 ? commentLines.slice().reverse().map(line => {
+          let badge = '🔹';
+          if (line.includes('🟢')) badge = '🟢';
+          else if (line.includes('🟡')) badge = '🟡';
+          else if (line.includes('🔴')) badge = '🔴';
+          
+          return `
+            <div style="font-size: 0.82rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border-radius: 8px; border-left: 3px solid ${badge === '🔴' ? '#f87171' : (badge === '🟡' ? '#fbbf24' : '#38bdf8')}; color: #e2e8f0; line-height: 1.4;">
+              ${escapeHtml(line)}
+            </div>
+          `;
+        }).join('') : `<p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Sin actualizaciones registradas por el líder aún. Usa el bot de Telegram para reportar avances.</p>`}
       </div>
+    </div>
 
-      <!-- Hidden per-project mini Gantt -->
-      <div id="gantt-panel-${safeId}" style="display:${isExpanded ? 'block' : 'none'}; overflow-x:auto; margin-top:0; border-top:1px solid var(--card-border); background:rgba(0,0,0,0.15); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg);">
-        ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases(proj.phases) : getWeeksForPhases(proj.phases), projColor)}
-      </div>
-    </div>`;
+    <!-- Chevron toggle for mini Gantt -->
+    <div style="display:flex; justify-content:center; margin-top:1rem; padding-top:0.5rem;">
+      <button
+        id="gantt-toggle-${safeId}"
+        onclick="window.toggleProjectGantt('${safeId}')"
+        style="background:transparent; border:none; color:${isExpanded ? 'var(--accent-primary)' : 'var(--text-muted)'}; cursor:pointer; display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; padding:0.25rem 1rem; transition:color 0.2s;"
+        title="Ver barra de cronograma"
+      >
+        <span>Cronograma</span>
+        <svg id="gantt-chevron-${safeId}" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="transition:transform 0.3s; transform: ${isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Hidden per-project mini Gantt -->
+    <div id="gantt-panel-${safeId}" style="display:${isExpanded ? 'block' : 'none'}; overflow-x:auto; margin-top:0.5rem; border-top:1px solid var(--card-border); background:rgba(0,0,0,0.15); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg);">
+      ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases(proj.phases) : getWeeksForPhases(proj.phases), projColor)}
+    </div>
+  </div>`;
 }
 
 function renderParticipantFilters() {
@@ -1710,17 +1745,54 @@ function setupEventListeners() {
     }
   });
 
+  // Initialize New Project Flatpickr range picker
+  const newProjDateInput = document.getElementById('newProjectDateRange');
+  if (newProjDateInput) {
+    appState.fpNewProjRange = flatpickr("#newProjectDateRange", {
+      mode: "range",
+      altInput: true,
+      altFormat: "d/m/Y",
+      dateFormat: "Y-m-d",
+      locale: { rangeSeparator: " → " },
+      onDayCreate: (dObj, dStr, fp, dayElem) => {
+        const dow = dayElem.dateObj.getDay();
+        if (dow === 0 || dow === 6) dayElem.classList.add('flatpickr-weekend');
+      },
+      onChange: (selectedDates) => {
+        const startVal = selectedDates[0] ? selectedDates[0].toLocaleDateString('en-CA') : '';
+        const endVal   = selectedDates[1] ? selectedDates[1].toLocaleDateString('en-CA') : '';
+        const startInput = document.getElementById('newProjectStartDate');
+        const endInput = document.getElementById('newProjectEndDate');
+        if (startInput) startInput.value = startVal;
+        if (endInput) endInput.value = endVal;
+      }
+    });
+  }
+
   const addProjectBtn = document.getElementById('addProjectBtn');
   if (addProjectBtn) {
     addProjectBtn.addEventListener('click', () => {
       const modal = document.getElementById('newProjectModal');
       const errorMsg = document.getElementById('newProjectError');
       const nameInput = document.getElementById('newProjectNameInput');
+      const respInput = document.getElementById('newProjectResponsibleInput');
+      const clientSelect = document.getElementById('newProjectClientSelect');
+
       if (modal) {
         if (errorMsg) errorMsg.style.display = 'none';
         if (nameInput) nameInput.value = '';
-        // Reset checkboxes
-        document.querySelectorAll('input[name="projectPhase"]').forEach(cb => cb.checked = true);
+        if (respInput) respInput.value = '';
+
+        if (clientSelect) {
+          clientSelect.innerHTML = appState.clients.map(c => 
+            `<option value="${c.name}" ${c.name === appState.selectedClient ? 'selected' : ''}>${c.name}</option>`
+          ).join('');
+        }
+
+        if (appState.fpNewProjRange) {
+          appState.fpNewProjRange.clear();
+        }
+
         modal.classList.add('active');
         setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
       }
@@ -1740,16 +1812,22 @@ function setupEventListeners() {
     const errorMsg = document.getElementById('newProjectError');
     if (errorMsg) errorMsg.style.display = 'none';
 
-    // Get selected phases
-    const selectedPhases = Array.from(document.querySelectorAll('input[name="projectPhase"]:checked')).map(cb => cb.value);
-    
-    if (selectedPhases.length === 0) {
+    let projectName = document.getElementById('newProjectNameInput')?.value.trim();
+    const clientName = document.getElementById('newProjectClientSelect')?.value || appState.selectedClient || 'General';
+    const responsible = document.getElementById('newProjectResponsibleInput')?.value.trim() || '';
+    const startDateVal = document.getElementById('newProjectStartDate')?.value;
+    const endDateVal = document.getElementById('newProjectEndDate')?.value;
+
+    if (!startDateVal || !endDateVal) {
       if (errorMsg) {
-        errorMsg.textContent = 'Debes seleccionar al menos una fase.';
+        errorMsg.textContent = 'Debes seleccionar el rango de fechas (Inicio y Término).';
         errorMsg.style.display = 'block';
       }
       return;
     }
+
+    const startDate = fromInputDate(startDateVal);
+    const deliveryDate = fromInputDate(endDateVal);
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
@@ -1757,9 +1835,6 @@ function setupEventListeners() {
     submitBtn.textContent = 'Creando...';
 
     try {
-      let projectName = document.getElementById('newProjectNameInput')?.value.trim();
-      
-      // Auto-generate name if empty
       if (!projectName) {
         const existingNames = new Set(appState.projects.map(p => p.name));
         projectName = 'Nuevo Proyecto';
@@ -1769,7 +1844,7 @@ function setupEventListeners() {
         }
       }
 
-      await createNewProject(db, projectName, appState.selectedClient || 'General', selectedPhases);
+      await createNewProject(db, projectName, clientName, responsible, startDate, deliveryDate);
       closeNewProjectModal();
     } catch (err) {
       console.error("Error creating project:", err);
@@ -2741,31 +2816,44 @@ window.generateExecutiveBriefing = async function() {
   const delayed = projects.filter(p => p.health === 'delayed');
   const completed = projects.filter(p => p.health === 'completed');
 
+  let projectDetailsList = projects.map(p => {
+    const rawComments = (p.phases.map(ph => ph.comment).filter(Boolean).join('\n') || p.comment || p.comments || '').trim();
+    return `* PROYECTO: ${p.name}
+  - Cliente: ${p.client} | Responsable: ${p.responsible || 'Sin asignar'}
+  - Plazo: ${p.startDate || '—'} a ${p.deliveryDate || '—'} (% Tiempo Transcurrido: ${p.overallProgress}%)
+  - Estado: ${p.healthLabel}
+  - Historial de Comentarios, Logros y Bloqueos:
+    ${rawComments ? rawComments.split('\n').map(c => `    > ${c}`).join('\n') : '    > Sin comentarios recientes.'}`;
+  }).join('\n\n');
+
   let payload = `
 INFORMACIÓN DE LA CARTERA DE PROYECTOS (${appState.execSelectedClient === 'all' ? 'Portafolio Global' : appState.execSelectedClient}):
 - Total de Proyectos: ${total}
 - A Tiempo: ${onTrack.length} (${onTrack.map(p => p.name).join(', ') || 'Ninguno'})
-- En Riesgo: ${atRisk.length} (${atRisk.map(p => `${p.name} [${p.overallProgress}% - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
-- Retrasados: ${delayed.length} (${delayed.map(p => `${p.name} [${p.overallProgress}% - Entrega: ${p.deliveryDate} - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
+- En Riesgo: ${atRisk.length} (${atRisk.map(p => `${p.name} [${p.overallProgress}% tiempo - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
+- Retrasados: ${delayed.length} (${delayed.map(p => `${p.name} [${p.overallProgress}% tiempo - Entrega: ${p.deliveryDate} - Resp: ${p.responsible}]`).join(', ') || 'Ninguno'})
 - Completados: ${completed.length} (${completed.map(p => p.name).join(', ') || 'Ninguno'})
 
-DETALLE DE COMENTARIOS DESTACADOS EN FASES:
-${projects.flatMap(p => p.phases.filter(ph => ph.comment).map(ph => `* [${p.name} - ${ph.phase}]: ${ph.comment}`)).join('\n') || 'Sin comentarios críticos.'}
+DETALLE Y COMENTARIOS POR PROYECTO:
+${projectDetailsList || 'Sin proyectos registrados.'}
 `;
 
   const prompt = `
-Actúa como un Director de Operaciones y Project Management Office (PMO) de alto nivel.
-Genera una Minuta y Briefing Ejecutivo dirigida a la Gerencia General y Jefaturas.
+Actúa como un Director de Operaciones (COO) y PMO Estratégico de alto nivel.
+Genera una Minuta Ejecutiva y Briefing de Estado para la Gerencia General y Jefaturas.
 
-Datos actuales:
+Datos actuales del portafolio:
 ${payload}
 
-Instrucciones de formato:
-1. **Resumen Ejecutivo**: Diagnóstico breve y claro del estado global (máx. 3 líneas).
-2. **Alertas Críticas y Proyectos en Foco**: Lista de 2-4 viñetas directas sobre los riesgos más urgentes, cuellos de botella o proyectos atrasados que requieren atención.
-3. **Próximos Hitos y Decisiones Sugeridas**: 3 recomendaciones estratégicas accionables para la mesa directiva.
+Instrucciones de análisis y formato:
+1. **Resumen Ejecutivo**: Diagnóstico global conciso (máx. 3 líneas) sobre el estado general del portafolio y cumplimiento del calendario.
+2. **🔴 Alertas Rojas y Bloqueos Críticos**: Identifica específicamente todos los proyectos que tienen bloqueos activos, impedimentos externos o semáforo rojo, explicando la causa y a quién impacta.
+3. **🎯 Diagnóstico de Etapa y Desviaciones**:
+   - Para los proyectos activos más relevantes o en riesgo, deduce en qué etapa real se encuentran (*Levantamiento, Diseño, Desarrollo, Testing/QA, Despliegue o Bloqueado*) según los comentarios.
+   - Detecta si hay discrepancias críticas (por ejemplo, si el tiempo transcurrido del calendario va en 70% o más pero los comentarios indican que siguen en fases iniciales como Levantamiento).
+4. **Decisiones Estratégicas Sugeridas**: 3 recomendaciones directas y accionables para la mesa directiva para destrabar al equipo.
 
-Utiliza un tono ejecutivo, sobrio, analítico y profesional. Usa formato Markdown limpio con encabezados claros y negritas.
+Utiliza un tono ejecutivo, analítico, sobrio y directo. Usa formato Markdown limpio con negritas claras y viñetas.
 `;
 
   try {
@@ -2785,7 +2873,7 @@ Utiliza un tono ejecutivo, sobrio, analítico y profesional. Usa formato Markdow
     contentEl.innerHTML = `
       <div style="margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
         <span class="exec-pill exec-pill-purple">Cartera: ${appState.execSelectedClient === 'all' ? 'Portafolio Global' : appState.execSelectedClient}</span>
-        <span style="font-size:0.75rem; color:var(--text-muted);">Generado con Gemini AI</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Generado con Gemini 2.5 Flash</span>
       </div>
       <div>${html}</div>
     `;
