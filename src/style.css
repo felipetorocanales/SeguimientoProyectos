@@ -732,16 +732,54 @@ span.flatpickr-weekday {
   border-bottom-color: #131727 !important;
 }
 
-/* Hide the hidden compatibility date inputs */
-#editStartDate,
-#editEndDate {
-  display: none !important;
-  visibility: hidden !important;
-  position: absolute !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
+/* Flatpickr generated altInput dark theme styling */
+input.flatpickr-input,
+input.flatpickr-input.form-control,
+input.flatpickr-input.form-control.input,
+.inline-date-picker-input {
+  background: rgba(56, 189, 248, 0.08) !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+  border-radius: 8px !important;
+  color: #38bdf8 !important;
+  font-family: inherit !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  padding: 0.28rem 0.75rem !important;
+  outline: none !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+input.flatpickr-input:hover,
+input.flatpickr-input:focus,
+.inline-date-picker-input:hover,
+.inline-date-picker-input:focus {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+}
+
+.postpone-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s ease;
+}
+
+.postpone-btn:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #f59e0b;
+  color: #fef08a;
+  transform: translateY(-1px);
 }
 
 /* ─── Global & Container Custom Scrollbars ─────────────────────────────────── */

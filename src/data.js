@@ -114,6 +114,7 @@ export async function createNewProject(db, projectName, clientName = 'General', 
     responsible: responsible || '',
     startDate: startDate || '',
     deliveryDate: deliveryDate || '',
+    originalDeliveryDate: deliveryDate || '',
     endDate: deliveryDate || '',
     state: 'En curso',
     progress: 0,
@@ -125,6 +126,48 @@ export async function createNewProject(db, projectName, clientName = 'General', 
   };
 
   await setDoc(doc(db, COLLECTION, id), projectData);
+}
+
+/**
+ * Postpones the project delivery date while permanently preserving the originalDeliveryDate.
+ */
+export async function postponeProjectDelivery(db, projectId, newDeliveryDate, reason = '') {
+  if (!newDeliveryDate) return;
+  const q = collection(db, COLLECTION);
+  const snapshot = await getDocs(q);
+  const docsToUpdate = snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
+
+  if (docsToUpdate.length === 0) return;
+
+  const firstDoc = docsToUpdate[0];
+  const currentDelivery = firstDoc.deliveryDate || firstDoc.endDate || '';
+  const originalDelivery = firstDoc.originalDeliveryDate || currentDelivery;
+
+  const today = new Date();
+  const d = String(today.getDate()).padStart(2, '0');
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const y = today.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const reasonStr = reason && reason.trim() ? ` (Motivo: ${reason.trim()})` : '';
+  const logEntry = `${dateStr}: ⏳ Fecha de entrega aplazada de ${currentDelivery} a ${newDeliveryDate}${reasonStr}`;
+
+  const promises = docsToUpdate.map(item => {
+    const docRef = doc(db, COLLECTION, item.id);
+    const existing = (item.comment || item.comments || '').trim();
+    const newComment = existing ? `${existing}\n${logEntry}` : logEntry;
+    return updateDoc(docRef, {
+      deliveryDate: newDeliveryDate,
+      endDate: newDeliveryDate,
+      originalDeliveryDate: item.originalDeliveryDate || originalDelivery,
+      comment: newComment,
+      lastModified: Date.now()
+    });
+  });
+
+  await Promise.all(promises);
 }
 
 /**
@@ -351,6 +394,25 @@ export function aggregateProjectData(phases) {
       proj.deliveryDate = `${String(maxEnd.getDate()).padStart(2, '0')}/${String(maxEnd.getMonth() + 1).padStart(2, '0')}/${maxEnd.getFullYear()}`;
     }
 
+    // Determine immutable originalDeliveryDate
+    const itemWithOrig = proj.phases.find(p => p.originalDeliveryDate);
+    if (itemWithOrig && itemWithOrig.originalDeliveryDate) {
+      proj.originalDeliveryDate = itemWithOrig.originalDeliveryDate;
+    } else if (!proj.originalDeliveryDate) {
+      proj.originalDeliveryDate = proj.deliveryDate;
+    }
+
+    const origDateObj = parseDate(proj.originalDeliveryDate);
+    const deliveryDateObj = parseDate(proj.deliveryDate);
+
+    // Calculate how many days the project has been postponed
+    if (origDateObj && deliveryDateObj && deliveryDateObj > origDateObj) {
+      const diffMs = deliveryDateObj.getTime() - origDateObj.getTime();
+      proj.postponedDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    } else {
+      proj.postponedDays = 0;
+    }
+
     const phaseOrder = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega', 'Ciclo Principal'];
     proj.phases.sort((a, b) => phaseOrder.indexOf(a.phase) - phaseOrder.indexOf(b.phase));
 
@@ -367,7 +429,6 @@ export function aggregateProjectData(phases) {
     }
     proj.overallProgress = overallProgress;
 
-    const deliveryDateObj = parseDate(proj.deliveryDate);
     if (deliveryDateObj) {
       const diffTime = deliveryDateObj.getTime() - today.getTime();
       proj.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

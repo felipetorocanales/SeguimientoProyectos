@@ -9,6 +9,7 @@ import {
   createNewProject,
   updateProjectMeta,
   addProjectComment,
+  postponeProjectDelivery,
   archiveProject,
   restoreProject,
   deleteProjectPermanently,
@@ -1196,33 +1197,6 @@ function renderProjects() {
   }
 
   // Initialize interactive inline date pickers for project cards
-  if (appState.currentUserRole === 'editor' || appState.currentUserRole === 'admin') {
-    document.querySelectorAll('.inline-date-picker-input').forEach(input => {
-      const projId = input.dataset.projectId;
-      const startIso = input.dataset.startIso;
-      const endIso = input.dataset.endIso;
-
-      flatpickr(input, {
-        mode: "range",
-        altInput: true,
-        altFormat: "d/m/Y",
-        dateFormat: "Y-m-d",
-        defaultDate: (startIso && endIso) ? [startIso, endIso] : undefined,
-        locale: { rangeSeparator: " → " },
-        onDayCreate: (dObj, dStr, fp, dayElem) => {
-          const dow = dayElem.dateObj.getDay();
-          if (dow === 0 || dow === 6) dayElem.classList.add('flatpickr-weekend');
-        },
-        onClose: async (selectedDates) => {
-          if (selectedDates.length === 2) {
-            const startStr = fromInputDate(selectedDates[0].toLocaleDateString('en-CA'));
-            const endStr = fromInputDate(selectedDates[1].toLocaleDateString('en-CA'));
-            await window.handleDateRangeChange(projId, startStr, endStr);
-          }
-        }
-      });
-    });
-  }
 }
 
 function renderProjectCard(proj, index, isArchived) {
@@ -1278,32 +1252,40 @@ function renderProjectCard(proj, index, isArchived) {
             `}
           </div>
 
-          ${canEdit && !isArchived ? `
-            <div style="position: relative; display: flex; align-items: center;" title="Haz clic para modificar las fechas de inicio y término">
-              <svg width="14" height="14" fill="none" stroke="#38bdf8" viewBox="0 0 24 24" style="position: absolute; left: 0.55rem; pointer-events: none; z-index: 2;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <input type="text"
-                     class="inline-date-picker-input"
-                     data-project-id="${proj.id}"
-                     data-start-iso="${toInputDate(proj.startDate)}"
-                     data-end-iso="${toInputDate(proj.deliveryDate)}"
-                     value="${proj.startDate && proj.deliveryDate ? `${proj.startDate} → ${proj.deliveryDate}` : ''}"
-                     placeholder="Asignar fechas..."
-                     readonly
-                     style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 0.25rem 0.6rem 0.25rem 1.9rem; color: #38bdf8; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none; width: 215px; transition: all 0.2s;" />
-            </div>
-          ` : `
-            <div style="display: flex; align-items: center; gap: 0.4rem; color: #38bdf8; font-size: 0.82rem; font-weight: 600;">
-              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.25rem;">
+            <!-- Fechas de Ejecución -->
+            <div style="display: flex; align-items: center; gap: 0.4rem; color: #38bdf8; font-size: 0.82rem; font-weight: 600; background: rgba(56, 189, 248, 0.08); padding: 0.25rem 0.65rem; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.25);">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               <span>${proj.startDate || '—'} → ${proj.deliveryDate || '—'}</span>
             </div>
-          `}
+
+            <!-- Compromiso Inicial Inmutable -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; color: #94a3b8; font-size: 0.76rem; background: rgba(255, 255, 255, 0.04); padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08);" title="Compromiso de entrega inicial (inmutable)">
+              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Meta Inicial: <strong style="color: #e2e8f0;">${proj.originalDeliveryDate || proj.deliveryDate || '—'}</strong></span>
+            </div>
+
+            <!-- Badge de Aplazamiento si existe -->
+            ${proj.postponedDays > 0 ? `
+              <span class="exec-pill exec-pill-yellow" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem;" title="El proyecto se ha aplazado ${proj.postponedDays} días respecto al compromiso original">
+                ⏳ +${proj.postponedDays} días aplazado
+              </span>
+            ` : ''}
+          </div>
         </div>
       </div>
 
       <!-- Actions & Global Time Progress -->
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
           ${canEdit && !isArchived ? `
+            <button onclick="window.openPostponeModal('${proj.id}')"
+                    class="postpone-btn"
+                    title="Aplazar fecha de entrega manteniendo el registro de la meta inicial">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Aplazar Entrega
+            </button>
+
             <button onclick="window.toggleProjectCompleted('${proj.id}', '${proj.status === 'Completado' ? 'En curso' : 'Completado'}')"
                     style="font-size: 0.76rem; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s; background: ${proj.status === 'Completado' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color: ${proj.status === 'Completado' ? '#93c5fd' : '#34d399'}; border: 1px solid ${proj.status === 'Completado' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}; font-weight: 600;"
                     title="${proj.status === 'Completado' ? 'Reabrir proyecto' : 'Marcar proyecto como finalizado'}">
@@ -1549,6 +1531,42 @@ window.toggleProjectCompleted = async function(projectId, newState) {
     console.error("Error al cambiar estado de proyecto:", err);
     alert("Error al cambiar estado.");
   }
+};
+
+window.openPostponeModal = function(projectId) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  const modal = document.getElementById('postponeModal');
+  const errorEl = document.getElementById('postponeError');
+  if (errorEl) errorEl.style.display = 'none';
+
+  document.getElementById('postponeProjectId').value = proj.id;
+  document.getElementById('postponeProjectName').textContent = proj.name;
+  document.getElementById('postponeOriginalDate').value = proj.originalDeliveryDate || proj.deliveryDate || '—';
+  document.getElementById('postponeCurrentDate').value = proj.deliveryDate || '—';
+  document.getElementById('postponeReason').value = '';
+
+  const newDateInput = document.getElementById('postponeNewDate');
+  if (newDateInput) {
+    if (appState.fpPostpone) {
+      appState.fpPostpone.destroy();
+    }
+    const minD = toInputDate(proj.deliveryDate) || toInputDate(proj.originalDeliveryDate) || undefined;
+    appState.fpPostpone = flatpickr("#postponeNewDate", {
+      altInput: true,
+      altFormat: "d/m/Y",
+      dateFormat: "d/m/Y",
+      minDate: minD,
+      defaultDate: minD,
+      onDayCreate: (dObj, dStr, fp, dayElem) => {
+        const dow = dayElem.dateObj.getDay();
+        if (dow === 0 || dow === 6) dayElem.classList.add('flatpickr-weekend');
+      }
+    });
+  }
+
+  modal?.classList.add('active');
 };
 
 window.handleMetaBlur = async function(el, projectId, field) {
@@ -1860,6 +1878,52 @@ function setupEventListeners() {
     } catch (err) {
       console.error("Error creating client:", err);
       alert("Error al guardar el cliente.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+
+  // Postpone Delivery Modal Listeners
+  const closePostponeModal = () => {
+    document.getElementById('postponeModal')?.classList.remove('active');
+  };
+
+  document.getElementById('closePostponeModalBtn')?.addEventListener('click', closePostponeModal);
+  document.getElementById('cancelPostponeBtn')?.addEventListener('click', closePostponeModal);
+  document.getElementById('postponeModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('postponeModal')) closePostponeModal();
+  });
+
+  document.getElementById('postponeForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const projectId = document.getElementById('postponeProjectId').value;
+    const newDateVal = document.getElementById('postponeNewDate').value;
+    const reason = document.getElementById('postponeReason').value.trim();
+    const errorEl = document.getElementById('postponeError');
+
+    if (!newDateVal) {
+      if (errorEl) {
+        errorEl.textContent = 'Por favor selecciona la nueva fecha de entrega.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando...';
+
+    try {
+      await postponeProjectDelivery(db, projectId, newDateVal, reason);
+      closePostponeModal();
+    } catch (err) {
+      console.error("Error al aplazar entrega:", err);
+      if (errorEl) {
+        errorEl.textContent = 'Ocurrió un error al guardar el aplazamiento.';
+        errorEl.style.display = 'block';
+      }
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = originalText;

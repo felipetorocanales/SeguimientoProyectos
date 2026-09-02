@@ -138,6 +138,17 @@ function groupPhasesIntoProjects(items) {
       .filter(Boolean)
       .join("\n");
 
+    // Determine immutable originalDeliveryDate
+    const itemWithOrig = proj.phases.find(p => p.originalDeliveryDate);
+    const originalDeliveryDate = itemWithOrig?.originalDeliveryDate || proj.phases[0]?.originalDeliveryDate || proj.deliveryDate;
+    
+    let postponedDays = 0;
+    const origDateObj = parseDate(originalDeliveryDate);
+    if (origDateObj && deliveryEnd && deliveryEnd > origDateObj) {
+      const diffMs = deliveryEnd.getTime() - origDateObj.getTime();
+      postponedDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    }
+
     projects.push({
       projectId: proj.projectId,
       name: proj.name,
@@ -145,6 +156,8 @@ function groupPhasesIntoProjects(items) {
       responsible: proj.responsible,
       startDate: proj.startDate,
       deliveryDate: proj.deliveryDate,
+      originalDeliveryDate,
+      postponedDays,
       status,
       health,
       healthLabel,
@@ -157,6 +170,7 @@ function groupPhasesIntoProjects(items) {
         progress: p.progress !== undefined ? p.progress : overallProgress,
         startDate: p.startDate || proj.startDate,
         endDate: p.endDate || proj.deliveryDate,
+        originalDeliveryDate: p.originalDeliveryDate || originalDeliveryDate,
         comment: p.comment || "",
         id: p.id,
       })),
