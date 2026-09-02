@@ -180,6 +180,41 @@ export async function updateProjectMeta(db, projectId, newName, newResponsible, 
 }
 
 /**
+ * Appends a new update / comment to a project across its Firestore documents.
+ */
+export async function addProjectComment(db, projectId, commentText) {
+  if (!commentText || !commentText.trim()) return;
+
+  const today = new Date();
+  const d = String(today.getDate()).padStart(2, '0');
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const y = today.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const formattedEntry = `${dateStr}: ${commentText.trim()}`;
+
+  const q = collection(db, COLLECTION);
+  const snapshot = await getDocs(q);
+  const docsToUpdate = snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
+
+  if (docsToUpdate.length === 0) return;
+
+  const promises = docsToUpdate.map(item => {
+    const docRef = doc(db, COLLECTION, item.id);
+    const existing = (item.comment || item.comments || '').trim();
+    const newComment = existing ? `${existing}\n${formattedEntry}` : formattedEntry;
+    return updateDoc(docRef, {
+      comment: newComment,
+      lastModified: Date.now()
+    });
+  });
+
+  await Promise.all(promises);
+}
+
+/**
  * Soft-deletes a project by marking its documents as archived.
  */
 export async function archiveProject(db, projectId, user) {

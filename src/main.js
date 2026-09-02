@@ -8,6 +8,7 @@ import {
   aggregateProjectData,
   createNewProject,
   updateProjectMeta,
+  addProjectComment,
   archiveProject,
   restoreProject,
   deleteProjectPermanently,
@@ -1297,12 +1298,25 @@ function renderProjectCard(proj, index, isArchived) {
 
     <!-- Feed / Historial de Actualizaciones -->
     <div style="background: rgba(3, 11, 30, 0.5); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.15); padding: 1rem; margin-top: 1rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
         <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4rem;">
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
           Historial de Actualizaciones (${commentLines.length})
         </span>
       </div>
+
+      ${canEdit && !isArchived ? `
+        <form id="comment-form-${safeId}" onsubmit="window.handleQuickCommentSubmit(event, '${proj.id}', '${safeId}')" style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem;">
+          <input type="text" id="comment-input-${safeId}" placeholder="Escribe un avance, bloqueo o nota del proyecto..." required
+                 style="flex: 1; background: rgba(0,0,0,0.35); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 0.45rem 0.85rem; color: #f8fafc; font-size: 0.82rem; outline: none; transition: all 0.2s;"
+                 onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 2px rgba(56,189,248,0.2)';" 
+                 onblur="this.style.borderColor='rgba(56, 189, 248, 0.25)'; this.style.boxShadow='none';" />
+          <button type="submit" class="primary" style="font-size: 0.78rem; padding: 0.45rem 0.95rem; border-radius: 8px; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; font-weight: 600;">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Comentar
+          </button>
+        </form>
+      ` : ''}
 
       <div style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;" class="custom-scrollbar">
         ${commentLines.length > 0 ? commentLines.slice().reverse().map(line => {
@@ -1316,7 +1330,7 @@ function renderProjectCard(proj, index, isArchived) {
               ${escapeHtml(line)}
             </div>
           `;
-        }).join('') : `<p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Sin actualizaciones registradas por el líder aún. Usa el bot de Telegram para reportar avances.</p>`}
+        }).join('') : `<p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Sin actualizaciones aún. Puedes agregar una aquí arriba o reportar desde Telegram.</p>`}
       </div>
     </div>
 
@@ -1451,7 +1465,29 @@ window.toggleProjectGantt = function(safeId) {
     appState.expandedProjects.add(safeId);
     panel.style.display = 'block';
     if (chevron) chevron.style.transform = 'rotate(180deg)';
-    if (btn) btn.style.color = 'var(--accent-primary)';
+  }
+};
+
+window.handleQuickCommentSubmit = async function(e, projectId, safeId) {
+  e.preventDefault();
+  const input = document.getElementById(`comment-input-${safeId}`);
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (!input || !input.value.trim()) return;
+
+  const text = input.value.trim();
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  try {
+    await addProjectComment(db, projectId, text);
+    input.value = '';
+  } catch (err) {
+    console.error("Error al agregar comentario:", err);
+    alert("Error al guardar el comentario. Intenta nuevamente.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
   }
 };
 
