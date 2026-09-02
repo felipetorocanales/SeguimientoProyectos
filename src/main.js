@@ -1686,7 +1686,7 @@ window.confirmRestoreProject = async function(projectId, projectName) {
 };
 
 function setupEventListeners() {
-  searchInput.addEventListener('input', (e) => {
+  searchInput?.addEventListener('input', (e) => {
     appState.searchQuery = e.target.value;
     renderProjects();
   });
@@ -1703,11 +1703,7 @@ function setupEventListeners() {
     }
   });
 
-  closeModalBtn.addEventListener('click', closeModal);
-  cancelBtn.addEventListener('click', closeModal);
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay) closeModal();
-  });
+
 
   // Delegación de eventos para botones de borrado y restauración
   document.addEventListener('click', (e) => {
