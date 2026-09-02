@@ -834,6 +834,15 @@ function renderGantt() {
       color = '#3b82f6'; // Azul
     }
 
+    const origEndDate = parseDate(proj.originalDeliveryDate);
+    const isPostponed = origEndDate && maxPhaseDate && maxPhaseDate > origEndDate && (proj.postponedDays > 0);
+    let origDurationDays = durationDays;
+    let postponedDurationDays = 0;
+    if (isPostponed) {
+      origDurationDays = Math.max(1, getWorkingDaysBetween(minPhaseDate, origEndDate));
+      postponedDurationDays = Math.max(1, getWorkingDaysBetween(origEndDate, maxPhaseDate));
+    }
+
     const cells = timeline.map((_, ci) => {
       if (ci === startCol) {
         const phasesHtml = proj.phases.map((ph, idx) => {
@@ -855,12 +864,23 @@ function renderGantt() {
           return `<div style="position:absolute; left:${leftPct}%; width:${wPct}%; height:100%; background:${color}; z-index:1; border-radius:6px;"></div>`;
         }).join('');
 
+        const origPct = (origDurationDays / durationDays) * 100;
+        const postPct = 100 - origPct;
+        const barInnerHtml = isPostponed ? `
+          <div style="position:absolute; left:0; width:${origPct}%; height:100%; background:${color}; z-index:1; border-radius:6px 0 0 6px;"></div>
+          <div style="position:absolute; left:${origPct}%; width:2px; height:100%; background:#fbbf24; z-index:3; box-shadow:0 0 6px #f59e0b;" title="Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
+          <div style="position:absolute; left:${origPct}%; width:${postPct}%; height:100%; background:repeating-linear-gradient(45deg, #f59e0b, #f59e0b 6px, #d97706 6px, #d97706 12px); z-index:1; border-radius:0 6px 6px 0;" title="Aplazamiento: +${proj.postponedDays}d"></div>
+        ` : phasesHtml;
+
         const responsibleInitials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         
         return `<td colspan="${span}" style="padding:0.5rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
           <div style="position:relative; background:${color}33; border-radius:6px; height:30px; display:flex; align-items:center; overflow:visible; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
-            ${phasesHtml}
-            <div style="position:relative; z-index:2; padding:0 1rem; font-size:0.72rem; font-weight:600; color:white; white-space:nowrap;">${proj.overallProgress}%</div>
+            ${barInnerHtml}
+            <div style="position:relative; z-index:2; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; display:flex; align-items:center; gap:0.4rem;">
+              <span>${proj.overallProgress}%</span>
+              ${isPostponed ? `<span style="background:rgba(0,0,0,0.5); padding:0.05rem 0.35rem; border-radius:3px; font-size:0.65rem; color:#fef08a;">⏳ +${proj.postponedDays}d</span>` : ''}
+            </div>
             
             <div style="position:absolute; right:-10px; top:-12px; width:26px; height:26px; border-radius:50%; background:${color}; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; color:white; z-index:4; border:2px solid var(--bg-color); box-shadow:0 4px 10px rgba(0,0,0,0.4);" title="${proj.responsible || 'Sin asignar'}">
               ${responsibleInitials}
@@ -973,14 +993,44 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
   let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
   if (widthPercent + offsetPercent > 100) widthPercent = 100 - offsetPercent;
 
+  const origE = parseDate(proj.originalDeliveryDate);
+  const isPostponed = origE && e && e > origE && (proj.postponedDays > 0);
+  
+  let origDurationDays = durationDays;
+  let postponedDurationDays = 0;
+  if (isPostponed) {
+    origDurationDays = Math.max(1, getWorkingDaysBetween(s, origE));
+    postponedDurationDays = Math.max(1, getWorkingDaysBetween(origE, e));
+  }
+
   const cells = timeline.map((_, ci) => {
     if (ci === startCol) return `<td colspan="${span}" style="padding:0.4rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
-      <div style="position:relative; height:28px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
-        <div title="${proj.startDate} → ${proj.deliveryDate} | ${proj.overallProgress}% transcurrido" 
-             style="background:${color}; opacity:0.95; border-radius:6px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.4);">
-          <span style="overflow:hidden; text-overflow:ellipsis;">${proj.startDate} → ${proj.deliveryDate}</span>
-          <span style="margin-left:0.5rem; background:rgba(0,0,0,0.25); padding:0.1rem 0.4rem; border-radius:4px;">${proj.overallProgress}%</span>
-        </div>
+      <div style="position:relative; height:30px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
+        ${isPostponed ? `
+          <div style="display:flex; height:100%; border-radius:6px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15);"
+               title="Compromiso Inicial: ${proj.startDate} → ${proj.originalDeliveryDate}\nNueva Fecha de Entrega: ${proj.deliveryDate} (+${proj.postponedDays} días aplazado)">
+            <!-- Segmento Inicial Original -->
+            <div style="flex:${origDurationDays}; background:${color}; display:flex; align-items:center; justify-content:space-between; padding:0 0.55rem; font-size:0.7rem; font-weight:700; color:white; white-space:nowrap; overflow:hidden; position:relative; min-width:80px;">
+              <span style="overflow:hidden; text-overflow:ellipsis;">${proj.startDate} → ${proj.originalDeliveryDate} (Meta)</span>
+              <span style="background:rgba(0,0,0,0.3); padding:0.1rem 0.35rem; border-radius:4px; font-size:0.65rem; margin-left:0.3rem;">${proj.overallProgress}%</span>
+            </div>
+            
+            <!-- Separador / Marca de Compromiso Original -->
+            <div style="width:3px; background:#fbbf24; z-index:2; box-shadow:0 0 8px #f59e0b;" title="Límite Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
+
+            <!-- Segmento de Aplazamiento con Rayas de Advertencia -->
+            <div style="flex:${postponedDurationDays}; background:repeating-linear-gradient(45deg, #f59e0b, #f59e0b 8px, #d97706 8px, #d97706 16px); display:flex; align-items:center; justify-content:center; padding:0 0.45rem; font-size:0.68rem; font-weight:800; color:#18181b; white-space:nowrap; overflow:hidden; min-width:60px; text-shadow:0 1px 0 rgba(255,255,255,0.4);"
+                 title="Aplazamiento: +${proj.postponedDays} días hasta ${proj.deliveryDate}">
+              <span>⏳ +${proj.postponedDays}d (${proj.deliveryDate})</span>
+            </div>
+          </div>
+        ` : `
+          <div title="${proj.startDate} → ${proj.deliveryDate} | ${proj.overallProgress}% transcurrido" 
+               style="background:${color}; opacity:0.95; border-radius:6px; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.4);">
+            <span style="overflow:hidden; text-overflow:ellipsis;">${proj.startDate} → ${proj.deliveryDate}</span>
+            <span style="margin-left:0.5rem; background:rgba(0,0,0,0.25); padding:0.1rem 0.4rem; border-radius:4px;">${proj.overallProgress}%</span>
+          </div>
+        `}
       </div></td>`;
     if (ci > startCol && ci < startCol + span) return '';
     return `<td style="border-left:1px solid rgba(255,255,255,0.04);"></td>`;
