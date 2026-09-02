@@ -72,12 +72,6 @@ const participantFiltersEl = document.getElementById('participantFilters');
 const papeleraSection = document.getElementById('papeleraSection');
 const archivedProjectsListEl = document.getElementById('archivedProjectsList');
 const statusFiltersEl = document.getElementById('statusFilters');
-const modalOverlay = document.getElementById('editModal');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const cancelBtn = document.getElementById('cancelBtn');
-const editForm = document.getElementById('editForm');
-const editProgressRange = document.getElementById('editProgressRange');
-const editProgressValue = document.getElementById('editProgressValue');
 
 // Date helpers: convert between DD/MM/YYYY (stored) and YYYY-MM-DD (HTML input)
 function toInputDate(ddmmyyyy) {
@@ -1200,6 +1194,35 @@ function renderProjects() {
       archivedProjectsListEl.innerHTML = '';
     }
   }
+
+  // Initialize interactive inline date pickers for project cards
+  if (appState.currentUserRole === 'editor' || appState.currentUserRole === 'admin') {
+    document.querySelectorAll('.inline-date-picker-input').forEach(input => {
+      const projId = input.dataset.projectId;
+      const startIso = input.dataset.startIso;
+      const endIso = input.dataset.endIso;
+
+      flatpickr(input, {
+        mode: "range",
+        altInput: true,
+        altFormat: "d/m/Y",
+        dateFormat: "Y-m-d",
+        defaultDate: (startIso && endIso) ? [startIso, endIso] : undefined,
+        locale: { rangeSeparator: " → " },
+        onDayCreate: (dObj, dStr, fp, dayElem) => {
+          const dow = dayElem.dateObj.getDay();
+          if (dow === 0 || dow === 6) dayElem.classList.add('flatpickr-weekend');
+        },
+        onClose: async (selectedDates) => {
+          if (selectedDates.length === 2) {
+            const startStr = fromInputDate(selectedDates[0].toLocaleDateString('en-CA'));
+            const endStr = fromInputDate(selectedDates[1].toLocaleDateString('en-CA'));
+            await window.handleDateRangeChange(projId, startStr, endStr);
+          }
+        }
+      });
+    });
+  }
 }
 
 function renderProjectCard(proj, index, isArchived) {
@@ -1220,8 +1243,6 @@ function renderProjectCard(proj, index, isArchived) {
   // Get all comments text
   const rawComments = (proj.phases.map(p => p.comment).filter(Boolean).join('\n') || proj.comment || proj.comments || '').trim();
   const commentLines = rawComments ? rawComments.split('\n').filter(Boolean) : [];
-
-  const mainPhaseId = (proj.phases[0] && proj.phases[0].id) || proj.id;
 
   return `
   <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s; margin-bottom: 1.5rem; padding: 1.5rem;">
@@ -1257,10 +1278,25 @@ function renderProjectCard(proj, index, isArchived) {
             `}
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.4rem; color: #38bdf8;">
-            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span>${proj.startDate || '—'} → ${proj.deliveryDate || '—'}</span>
-          </div>
+          ${canEdit && !isArchived ? `
+            <div style="position: relative; display: flex; align-items: center;" title="Haz clic para modificar las fechas de inicio y término">
+              <svg width="14" height="14" fill="none" stroke="#38bdf8" viewBox="0 0 24 24" style="position: absolute; left: 0.55rem; pointer-events: none; z-index: 2;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <input type="text"
+                     class="inline-date-picker-input"
+                     data-project-id="${proj.id}"
+                     data-start-iso="${toInputDate(proj.startDate)}"
+                     data-end-iso="${toInputDate(proj.deliveryDate)}"
+                     value="${proj.startDate && proj.deliveryDate ? `${proj.startDate} → ${proj.deliveryDate}` : ''}"
+                     placeholder="Asignar fechas..."
+                     readonly
+                     style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 0.25rem 0.6rem 0.25rem 1.9rem; color: #38bdf8; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none; width: 215px; transition: all 0.2s;" />
+            </div>
+          ` : `
+            <div style="display: flex; align-items: center; gap: 0.4rem; color: #38bdf8; font-size: 0.82rem; font-weight: 600;">
+              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span>${proj.startDate || '—'} → ${proj.deliveryDate || '—'}</span>
+            </div>
+          `}
         </div>
       </div>
 
@@ -1268,9 +1304,11 @@ function renderProjectCard(proj, index, isArchived) {
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           ${canEdit && !isArchived ? `
-            <button class="primary" style="font-size: 0.78rem; padding: 0.35rem 0.8rem; display: flex; align-items: center; gap: 0.4rem;" onclick="window.openEditModal('${mainPhaseId}')">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-              Editar Fechas / Estado
+            <button onclick="window.toggleProjectCompleted('${proj.id}', '${proj.status === 'Completado' ? 'En curso' : 'Completado'}')"
+                    style="font-size: 0.76rem; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s; background: ${proj.status === 'Completado' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color: ${proj.status === 'Completado' ? '#93c5fd' : '#34d399'}; border: 1px solid ${proj.status === 'Completado' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}; font-weight: 600;"
+                    title="${proj.status === 'Completado' ? 'Reabrir proyecto' : 'Marcar proyecto como finalizado'}">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              ${proj.status === 'Completado' ? 'Reabrir' : 'Finalizar'}
             </button>
           ` : ''}
 
@@ -1491,6 +1529,28 @@ window.handleQuickCommentSubmit = async function(e, projectId, safeId) {
   }
 };
 
+window.handleDateRangeChange = async function(projectId, startDate, deliveryDate) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+  try {
+    await updateProjectMeta(db, projectId, proj.name, proj.responsible, proj.client, startDate, deliveryDate);
+  } catch (err) {
+    console.error("Error al actualizar fechas:", err);
+    alert("Error al actualizar las fechas.");
+  }
+};
+
+window.toggleProjectCompleted = async function(projectId, newState) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+  try {
+    await updateProjectMeta(db, projectId, proj.name, proj.responsible, proj.client, proj.startDate, proj.deliveryDate, newState);
+  } catch (err) {
+    console.error("Error al cambiar estado de proyecto:", err);
+    alert("Error al cambiar estado.");
+  }
+};
+
 window.handleMetaBlur = async function(el, projectId, field) {
   const newValue = el.innerText.replace(/\s+/g, ' ').trim();
   const proj = appState.projects.find(p => p.id === projectId);
@@ -1667,123 +1727,6 @@ function setupEventListeners() {
     if (archiveBtn) {
       window.confirmArchiveProject(archiveBtn.dataset.projectId, archiveBtn.dataset.projectName);
       return;
-    }
-  });
-
-  editProgressRange.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value, 10);
-    editProgressValue.textContent = `${val}%`;
-    if (val === 100) {
-      document.getElementById('editState').value = 'Finalizado';
-    } else if (val > 0 && document.getElementById('editState').value === 'No iniciado') {
-      document.getElementById('editState').value = 'En curso';
-    } else if (val === 0) {
-      document.getElementById('editState').value = 'No iniciado';
-    }
-  });
-
-  const dateRangeInput = document.getElementById('editDateRange');
-  const displayStart   = document.getElementById('displayStartDate');
-  const displayEnd     = document.getElementById('displayEndDate');
-
-  // Format a YYYY-MM-DD string as DD/MM/YYYY for display
-  function fmtDisplay(yyyymmdd) {
-    if (!yyyymmdd) return '—';
-    const [y, m, d] = yyyymmdd.split('-');
-    return `${d}/${m}/${y}`;
-  }
-
-  // Initialize single Flatpickr range picker
-  appState.fpRange = flatpickr("#editDateRange", {
-    mode: "range",
-    altInput: true,
-    altFormat: "d/m/Y",
-    dateFormat: "Y-m-d",
-    locale: {
-      rangeSeparator: " → "
-    },
-    onDayCreate: (dObj, dStr, fp, dayElem) => {
-      const dow = dayElem.dateObj.getDay();
-      if (dow === 0 || dow === 6) {
-        dayElem.classList.add('flatpickr-weekend');
-      }
-    },
-    onChange: (selectedDates) => {
-      const startVal = selectedDates[0] ? selectedDates[0].toLocaleDateString('en-CA') : '';
-      const endVal   = selectedDates[1] ? selectedDates[1].toLocaleDateString('en-CA') : '';
-
-      // Keep hidden inputs in sync
-      document.getElementById('editStartDate').value = startVal;
-      document.getElementById('editEndDate').value   = endVal;
-
-      // Update the display badges
-      if (displayStart) displayStart.textContent = fmtDisplay(startVal) || '—';
-      if (displayEnd)   displayEnd.textContent   = fmtDisplay(endVal)   || '—';
-
-      // Clear errors while picking
-      document.getElementById('dateError').style.display = 'none';
-    }
-  });
-
-  // Compatibility shims so the rest of the code still works
-  appState.fpStart = {
-    setDate: (v) => {},
-    set: (k, v) => {
-      if (k === 'maxDate') appState.fpRange.set('maxDate', v);
-      if (k === 'minDate') appState.fpRange.set('minDate', v);
-    }
-  };
-  appState.fpEnd = appState.fpStart;
-
-  editForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const phaseId = document.getElementById('editPhaseId').value;
-    const newState = document.getElementById('editState').value;
-    const newProgress = parseInt(editProgressRange.value, 10);
-    const newComment = document.getElementById('editComment').value;
-    const startDateVal = document.getElementById('editStartDate').value;
-    const endDateVal   = document.getElementById('editEndDate').value;
-    const newStartDate = fromInputDate(startDateVal);
-    const newEndDate = fromInputDate(endDateVal);
-
-    // Validate start > end
-    if (startDateVal && endDateVal && startDateVal > endDateVal) {
-      document.getElementById('dateError').style.display = 'block';
-      return;
-    }
-    document.getElementById('dateError').style.display = 'none';
-
-    // Validate against project's delivery date
-    const maxAllowed = document.getElementById('editStartDate').max;
-    const dateToCheck = endDateVal || startDateVal;
-    if (maxAllowed && dateToCheck && dateToCheck > maxAllowed) {
-      const deliveryErrorEl = document.getElementById('deliveryError');
-      if (deliveryErrorEl) deliveryErrorEl.style.display = 'block';
-      return;
-    }
-    const deliveryErrorEl = document.getElementById('deliveryError');
-    if (deliveryErrorEl) deliveryErrorEl.style.display = 'none';
-
-    const saveBtn = editForm.querySelector('button[type="submit"]');
-    saveBtn.textContent = 'Guardando...';
-    saveBtn.disabled = true;
-
-    try {
-      await updatePhase(db, phaseId, {
-        state: newState,
-        progress: newProgress,
-        comment: newComment,
-        startDate: newStartDate,
-        endDate: newEndDate
-      });
-      closeModal();
-    } catch (err) {
-      console.error("Error updating phase:", err);
-      saveBtn.textContent = 'Error, intenta de nuevo';
-    } finally {
-      saveBtn.textContent = 'Guardar Cambios';
-      saveBtn.disabled = false;
     }
   });
 
@@ -1978,62 +1921,6 @@ function setupEventListeners() {
   });
 }
 
-
-window.openEditModal = function(phaseId) {
-  const phase = appState.rawPhases.find(p => p.id === phaseId);
-  if (!phase) return;
-
-  document.getElementById('modalTitle').textContent = `${phase.project} — ${phase.phase}`;
-  document.getElementById('editPhaseId').value = phase.id;
-  document.getElementById('editState').value = phase.state;
-
-  const progress = phase.progress || 0;
-  editProgressRange.value = progress;
-  editProgressValue.textContent = `${progress}%`;
-
-  document.getElementById('editComment').value = phase.comment || '';
-  document.getElementById('editStartDate').value = toInputDate(phase.startDate);
-  document.getElementById('editEndDate').value = toInputDate(phase.endDate);
-
-  // Compute max date from the project's Entrega phase (if not editing Entrega itself)
-  const isEntrega = phase.phase === 'Entrega';
-  const entregaPhase = isEntrega
-    ? null
-    : appState.rawPhases.find(p => p.project === phase.project && p.phase === 'Entrega');
-  const maxDateVal = entregaPhase ? toInputDate(entregaPhase.endDate) : '';
-
-  // Set max/min constraints on range picker
-  appState.fpRange.set('maxDate', maxDateVal || null);
-  // Set initial range
-  if (toInputDate(phase.startDate) || toInputDate(phase.endDate)) {
-    const dates = [toInputDate(phase.startDate), toInputDate(phase.endDate)].filter(Boolean);
-    appState.fpRange.setDate(dates);
-  } else {
-    appState.fpRange.clear();
-  }
-
-  // Update display badges
-  const displayStart = document.getElementById('displayStartDate');
-  const displayEnd   = document.getElementById('displayEndDate');
-  if (displayStart) displayStart.textContent = phase.startDate || '—';
-  if (displayEnd)   displayEnd.textContent   = phase.endDate   || '—';
-
-  // Update the delivery error text to show the limit date
-  const deliveryErrorEl = document.getElementById('deliveryError');
-  if (deliveryErrorEl && entregaPhase) {
-    deliveryErrorEl.textContent = `⚠️ Las fechas no pueden superar la fecha de entrega del proyecto: ${entregaPhase.endDate}.`;
-  }
-
-  // Hide errors on open
-  document.getElementById('dateError').style.display = 'none';
-  if (deliveryErrorEl) deliveryErrorEl.style.display = 'none';
-
-  modalOverlay.classList.add('active');
-};
-
-function closeModal() {
-  modalOverlay.classList.remove('active');
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // EXECUTIVE SUMMARY MODULE (VISTA DIRECTIVA / GERENCIA)
