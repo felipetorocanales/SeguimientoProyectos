@@ -1354,16 +1354,67 @@ function renderProjectCard(proj, index, isArchived) {
           `) : ''}
         </div>
 
-        <div style="text-align: right;">
-          <span style="font-size: 1.15rem; font-weight: 800; color: #38bdf8;">${proj.overallProgress}%</span>
-          <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: 0.3rem;">Tiempo Transcurrido</span>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          ${proj.progressGap > 20 && proj.status !== 'Completado' ? `
+            <span class="exec-pill exec-pill-coral" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem;" title="El avance real tiene un desfase de -${proj.progressGap}% respecto al tiempo transcurrido">
+              ⚠️ Desfase: -${proj.progressGap}%
+            </span>
+          ` : ''}
+          <div style="text-align: right;">
+            <div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 0.35rem;">
+              <span style="font-size: 1.15rem; font-weight: 800; color: #34d399;">${proj.realProgress}%</span>
+              <span style="font-size: 0.76rem; color: #94a3b8; font-weight: 600;">Avance Real</span>
+            </div>
+            <div style="font-size: 0.72rem; color: #38bdf8;">
+              <span>${proj.timeProgress}% Tiempo Transcurrido</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Calendar Progress Bar -->
-    <div class="progress-container" style="margin: 0.75rem 0 1.25rem; height: 7px; background: rgba(255,255,255,0.08);">
-      <div class="progress-bar" style="width: ${proj.overallProgress}%; background: ${proj.health === 'completed' ? 'var(--status-done)' : (proj.health === 'delayed' ? 'var(--exec-soft-coral)' : (proj.health === 'at_risk' ? '#f59e0b' : 'linear-gradient(90deg, #38bdf8, #6366f1)'))};"></div>
+    <!-- Dual Progress Bars: Avance Real vs Tiempo Consumido -->
+    <div class="dual-progress-container">
+      <!-- Fila 1: Avance Real (Estimado / Reportado) -->
+      <div class="metric-row">
+        <div class="metric-header">
+          <span style="display: flex; align-items: center; gap: 0.4rem; color: #cbd5e1; font-weight: 600;">
+            <span style="color: #34d399;">📈</span>
+            <span>Avance Real</span>
+            ${canEdit && !isArchived ? `
+              <span class="real-progress-badge editable" 
+                    contenteditable="true"
+                    role="textbox"
+                    title="Haz clic para modificar el % de avance real"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                    onblur="window.handleRealProgressBlur(this, '${proj.id}')">
+                ${proj.realProgress}%
+              </span>
+              <span style="font-size: 0.68rem; color: #64748b;">(clic para editar)</span>
+            ` : `
+              <span class="real-progress-badge">${proj.realProgress}%</span>
+            `}
+          </span>
+          <span style="font-size: 0.75rem; color: #34d399; font-weight: 700;">${proj.realProgress}%</span>
+        </div>
+        <div class="dual-progress-bar-track">
+          <div class="dual-progress-bar-fill" style="width: ${proj.realProgress}%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%); box-shadow: 0 0 10px rgba(16,185,129,0.35);"></div>
+        </div>
+      </div>
+
+      <!-- Fila 2: Tiempo Consumido (% de Calendario) -->
+      <div class="metric-row">
+        <div class="metric-header">
+          <span style="display: flex; align-items: center; gap: 0.4rem; color: #94a3b8; font-size: 0.75rem;">
+            <span style="color: #38bdf8;">⏱️</span>
+            <span>Tiempo de Calendario Consumido</span>
+          </span>
+          <span style="font-size: 0.75rem; color: #38bdf8; font-weight: 600;">${proj.timeProgress}%</span>
+        </div>
+        <div class="dual-progress-bar-track" style="height: 5px; background: rgba(255, 255, 255, 0.05);">
+          <div class="dual-progress-bar-fill" style="width: ${proj.timeProgress}%; background: ${proj.health === 'delayed' ? 'var(--exec-soft-coral)' : 'linear-gradient(90deg, #3b82f6, #6366f1)'};"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Feed / Historial de Actualizaciones -->
@@ -1572,11 +1623,44 @@ window.handleDateRangeChange = async function(projectId, startDate, deliveryDate
   }
 };
 
+window.handleRealProgressBlur = async function(el, projectId) {
+  const rawText = el.innerText.replace('%', '').trim();
+  const numValue = parseInt(rawText, 10);
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+    el.innerText = `${proj.realProgress}%`;
+    alert("Por favor ingresa un porcentaje de avance válido entre 0 y 100.");
+    return;
+  }
+
+  if (numValue === proj.realProgress) {
+    el.innerText = `${numValue}%`;
+    return;
+  }
+
+  // Optimistic update
+  proj.realProgress = numValue;
+  proj.overallProgress = numValue;
+  proj.progressGap = proj.timeProgress - numValue;
+
+  try {
+    await updateProjectMeta(db, projectId, proj.name, proj.responsible, proj.client, proj.startDate, proj.deliveryDate, proj.state, proj.inferredPhase, numValue);
+  } catch (err) {
+    console.error("Error al actualizar avance real:", err);
+    el.innerText = `${proj.realProgress}%`;
+    alert("Error al actualizar el avance real.");
+  }
+};
+
 window.toggleProjectCompleted = async function(projectId, newState) {
   const proj = appState.projects.find(p => p.id === projectId);
   if (!proj) return;
+  const isCompleting = newState === 'Completado';
+  const newRealProgress = isCompleting ? 100 : (proj.realProgress === 100 ? 50 : proj.realProgress);
   try {
-    await updateProjectMeta(db, projectId, proj.name, proj.responsible, proj.client, proj.startDate, proj.deliveryDate, newState);
+    await updateProjectMeta(db, projectId, proj.name, proj.responsible, proj.client, proj.startDate, proj.deliveryDate, newState, proj.inferredPhase, newRealProgress);
   } catch (err) {
     console.error("Error al cambiar estado de proyecto:", err);
     alert("Error al cambiar estado.");
@@ -2328,7 +2412,9 @@ function renderExecutiveScatterPlot(projects) {
     .map(p => ({
       name: p.name,
       client: p.client,
-      progress: p.overallProgress || 0,
+      progress: p.realProgress !== undefined ? p.realProgress : (p.overallProgress || 0),
+      realProgress: p.realProgress !== undefined ? p.realProgress : (p.overallProgress || 0),
+      timeProgress: p.timeProgress !== undefined ? p.timeProgress : (p.overallProgress || 0),
       health: p.health,
       healthLabel: p.healthLabel,
       deliveryDateStr: p.deliveryDate,
@@ -2428,7 +2514,7 @@ function renderExecutiveScatterPlot(projects) {
     return `
       <g class="chart-dot" style="cursor: pointer;" onclick="window.highlightProjectInMatrix('${dp.name}')">
         <circle cx="${cx}" cy="${cy}" r="7" fill="${dotColor}" stroke="rgba(255,255,255,0.2)" stroke-width="1.5">
-          <title>${dp.name} (${dp.client})\nProgreso: ${dp.progress}%\nEntrega: ${dp.deliveryDateStr}\nSalud: ${dp.healthLabel}</title>
+          <title>${dp.name} (${dp.client})\nAvance Real: ${dp.realProgress}%\nTiempo Consumido: ${dp.timeProgress}%\nEntrega: ${dp.deliveryDateStr}\nSalud: ${dp.healthLabel}</title>
         </circle>
         <circle cx="${cx}" cy="${cy}" r="12" fill="transparent" />
       </g>
@@ -2616,7 +2702,9 @@ function renderExecutiveRisks(projects) {
       if (overduePhase) {
         reason = `Fase intermedia "${overduePhase.phase}" atrasada (${overduePhase.endDate}).`;
       } else if (proj.daysRemaining !== null && proj.daysRemaining <= 7) {
-        reason = `Entrega cercana (${proj.daysRemaining}d restantes) con avance rezagado (${proj.overallProgress}%).`;
+        reason = `Entrega cercana (${proj.daysRemaining}d restantes) con avance real rezagado (${proj.realProgress ?? proj.overallProgress}%).`;
+      } else if ((proj.progressGap ?? 0) >= 20) {
+        reason = `Desfase de -${proj.progressGap}% entre avance real (${proj.realProgress}%) y tiempo consumido (${proj.timeProgress}%).`;
       } else {
         reason = 'Proyecto con inicio pendiente o riesgo en cronograma.';
       }
@@ -2634,7 +2722,7 @@ function renderExecutiveRisks(projects) {
 
         <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
           <div style="text-align: right;">
-            <div style="font-size: 0.85rem; font-weight: 700; color: ${isDelayed ? 'var(--exec-soft-coral)' : 'var(--exec-soft-amber)'};">${proj.overallProgress}%</div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: ${isDelayed ? 'var(--exec-soft-coral)' : 'var(--exec-soft-amber)'};">${proj.realProgress ?? proj.overallProgress}%</div>
             <div style="font-size: 0.68rem; color: var(--text-muted);">${proj.client}</div>
           </div>
           <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #e0e7ff;" title="${proj.responsible || 'Sin asignar'}">
@@ -2695,8 +2783,13 @@ function renderExecutiveDeliveries(projects) {
 
         <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
           ${daysBadge}
-          <div style="width: 50px; text-align: right; font-weight: 700; font-size: 0.85rem; color: var(--text-main);">
-            ${proj.overallProgress}%
+          <div style="text-align: right; min-width: 60px;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: #34d399;">
+              ${proj.realProgress ?? proj.overallProgress}%
+            </div>
+            <div style="font-size: 0.68rem; color: #38bdf8;">
+              ${proj.timeProgress ?? proj.overallProgress}% tpo
+            </div>
           </div>
         </div>
       </div>
@@ -2798,13 +2891,16 @@ function renderExecutiveProjectsTable(projects) {
             ${proj.currentPhase}
           </span>
         </td>
-        <td style="min-width: 140px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.75rem;">
-            <span style="color: var(--text-muted);">${proj.status}</span>
-            <strong style="color: var(--text-main);">${proj.overallProgress}%</strong>
+        <td style="min-width: 150px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem; font-size: 0.75rem;">
+            <span style="color: #34d399; font-weight: 700;">Real: ${proj.realProgress ?? proj.overallProgress}%</span>
+            <span style="color: #38bdf8; font-size: 0.72rem;">Tiempo: ${proj.timeProgress ?? proj.overallProgress}%</span>
           </div>
-          <div class="exec-progress-wrap">
-            <div class="exec-progress-fill" style="width: ${proj.overallProgress}%; background: ${(proj.overallProgress === 100) ? 'var(--exec-soft-blue)' : 'linear-gradient(90deg, #6366f1, #6ee7b7)'};"></div>
+          <div class="exec-progress-wrap" style="height: 6px; margin-bottom: 0.25rem;">
+            <div class="exec-progress-fill" style="width: ${proj.realProgress ?? proj.overallProgress}%; background: linear-gradient(90deg, #10b981, #06b6d4);"></div>
+          </div>
+          <div class="exec-progress-wrap" style="height: 3px; background: rgba(255,255,255,0.05);">
+            <div class="exec-progress-fill" style="width: ${proj.timeProgress ?? proj.overallProgress}%; background: ${proj.health === 'delayed' ? 'var(--exec-soft-coral)' : '#3b82f6'};"></div>
           </div>
         </td>
         <td>

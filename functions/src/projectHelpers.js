@@ -96,10 +96,26 @@ function groupPhasesIntoProjects(items) {
       (proj.phases.length > 0 && proj.phases.every(p => p.state === "Completado" || p.state === "Finalizado"));
 
     // Calculate automatic time-based progress
-    let overallProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
+    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
     if (isCompleted) {
-      overallProgress = 100;
+      timeProgress = 100;
     }
+
+    // Real progress
+    const itemWithReal = proj.phases.find(p => p.realProgress !== undefined && p.realProgress !== null);
+    let realProgress = 0;
+    if (isCompleted) {
+      realProgress = 100;
+    } else if (itemWithReal && itemWithReal.realProgress !== undefined) {
+      realProgress = Number(itemWithReal.realProgress);
+    } else if (proj.phases.length > 0 && proj.phases[0].progress !== undefined && proj.phases[0].progress !== null) {
+      realProgress = Number(proj.phases[0].progress);
+    } else {
+      realProgress = timeProgress;
+    }
+    realProgress = Math.min(100, Math.max(0, Math.round(realProgress)));
+    const overallProgress = realProgress;
+    const progressGap = timeProgress - realProgress;
 
     // Health & Status determination
     let health = "on_track";
@@ -119,13 +135,17 @@ function groupPhasesIntoProjects(items) {
       const diffTime = deliveryEnd.getTime() - today.getTime();
       const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // If less than 7 days remaining and time progress > 80% with blockers
+      // If less than 7 days remaining and real progress < 75% or with blockers
       const allComments = proj.phases.map(p => p.comment || "").join(" ") + " " + (typeof proj.comments === "string" ? proj.comments : "");
       if (allComments.includes("🔴") || allComments.toLowerCase().includes("bloqueado")) {
         health = "at_risk";
         healthLabel = "En Riesgo";
         status = "En Riesgo";
-      } else if (daysRemaining <= 7 && overallProgress < 70) {
+      } else if (daysRemaining <= 7 && realProgress < 75) {
+        health = "at_risk";
+        healthLabel = "En Riesgo";
+        status = "En Riesgo";
+      } else if (progressGap >= 25 && timeProgress > 40) {
         health = "at_risk";
         healthLabel = "En Riesgo";
         status = "En Riesgo";
@@ -161,13 +181,17 @@ function groupPhasesIntoProjects(items) {
       status,
       health,
       healthLabel,
+      timeProgress,
+      realProgress,
+      progressGap,
       overallProgress,
       inferredPhase: proj.inferredPhase || (isCompleted ? "Completado" : "En curso"),
       comment: combinedComments || (typeof proj.comments === "string" ? proj.comments : ""),
       phases: proj.phases.map(p => ({
         phase: p.phase || "Ciclo Principal",
         state: p.state || "En curso",
-        progress: p.progress !== undefined ? p.progress : overallProgress,
+        progress: p.progress !== undefined ? p.progress : realProgress,
+        realProgress: p.realProgress !== undefined ? p.realProgress : realProgress,
         startDate: p.startDate || proj.startDate,
         endDate: p.endDate || proj.deliveryDate,
         originalDeliveryDate: p.originalDeliveryDate || originalDeliveryDate,

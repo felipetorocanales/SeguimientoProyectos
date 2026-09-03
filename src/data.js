@@ -118,6 +118,7 @@ export async function createNewProject(db, projectName, clientName = 'General', 
     endDate: deliveryDate || '',
     state: 'En curso',
     progress: 0,
+    realProgress: 0,
     comment: '',
     inferredPhase: 'Levantamiento',
     isSingleCycle: true,
@@ -178,20 +179,16 @@ export async function createAuditLog(db, user, action, projectDetails) {
   const logRef = doc(collection(db, LOGS_COLLECTION));
   await setDoc(logRef, {
     timestamp: Date.now(),
-    date: new Date().toLocaleString('es-CL'),
-    userEmail: user.email,
-    userId: user.uid,
-    action: action, // 'ARCHIVE', 'RESTORE', 'DELETE_PERMANENT'
-    projectName: projectDetails.name,
-    projectId: projectDetails.id,
-    client: projectDetails.client
+    user: user.email || user.username || 'Desconocido',
+    action,
+    projectDetails
   });
 }
 
 /**
- * Updates project-wide metadata (name, responsible, client, dates) across its documents.
+ * Updates project-wide metadata (name, responsible, client, dates, realProgress) across its documents.
  */
-export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient, startDate, deliveryDate, state, inferredPhase) {
+export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient, startDate, deliveryDate, state, inferredPhase, realProgress) {
   const finalNewName = (newName || '').replace(/\s+/g, ' ').trim();
   const q = collection(db, COLLECTION);
   const snapshot = await getDocs(q);
@@ -215,6 +212,10 @@ export async function updateProjectMeta(db, projectId, newName, newResponsible, 
     }
     if (state !== undefined) updates.state = state;
     if (inferredPhase !== undefined) updates.inferredPhase = inferredPhase;
+    if (realProgress !== undefined) {
+      updates.realProgress = Number(realProgress);
+      updates.progress = Number(realProgress);
+    }
 
     return updateDoc(docRef, updates);
   });
@@ -419,15 +420,31 @@ export function aggregateProjectData(phases) {
     const isCompleted = proj.state === 'Completado' || proj.state === 'Finalizado' ||
       (proj.phases.length > 0 && proj.phases.every(p => p.state === 'Finalizado' || p.state === 'Completado'));
 
-    // Automatic time-based progress
-    let overallProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
+    // Automatic time-based progress (Calendario consumido)
+    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
     if (isCompleted) {
-      overallProgress = 100;
+      timeProgress = 100;
       proj.status = 'Completado';
     } else {
       proj.status = 'En curso';
     }
-    proj.overallProgress = overallProgress;
+    proj.timeProgress = timeProgress;
+
+    // Real progress (Reportado / Estimado IA o Manual)
+    const itemWithReal = proj.phases.find(p => p.realProgress !== undefined && p.realProgress !== null);
+    let realProgress = 0;
+    if (isCompleted) {
+      realProgress = 100;
+    } else if (itemWithReal && itemWithReal.realProgress !== undefined) {
+      realProgress = Number(itemWithReal.realProgress);
+    } else if (proj.phases.length > 0 && proj.phases[0].progress !== undefined && proj.phases[0].progress !== null) {
+      realProgress = Number(proj.phases[0].progress);
+    } else {
+      realProgress = timeProgress;
+    }
+    proj.realProgress = Math.min(100, Math.max(0, Math.round(realProgress)));
+    proj.overallProgress = proj.realProgress; // maintain backward compatibility
+    proj.progressGap = proj.timeProgress - proj.realProgress;
 
     if (deliveryDateObj) {
       const diffTime = deliveryDateObj.getTime() - today.getTime();
@@ -451,7 +468,9 @@ export function aggregateProjectData(phases) {
       const allComments = proj.phases.map(p => p.comment || '').join(' ') + ' ' + (proj.comments || '');
       if (allComments.includes('🔴') || allComments.toLowerCase().includes('bloqueado')) {
         isAtRisk = true;
-      } else if (proj.daysRemaining !== null && proj.daysRemaining <= 7 && overallProgress < 75) {
+      } else if (proj.daysRemaining !== null && proj.daysRemaining <= 7 && proj.realProgress < 75) {
+        isAtRisk = true;
+      } else if (proj.progressGap >= 25 && proj.timeProgress > 40) {
         isAtRisk = true;
       }
 
