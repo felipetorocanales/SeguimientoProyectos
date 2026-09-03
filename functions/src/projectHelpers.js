@@ -47,7 +47,11 @@ function calculateTimeProgress(startDateStr, deliveryDateStr) {
 function groupPhasesIntoProjects(items) {
   const projectMap = new Map();
 
-  for (const item of items) {
+  // Prefer exclusively single-cycle project documents (new architecture & migrated)
+  const singleCycleItems = items.filter(i => (i.isSingleCycle === true || i.phase === "Ciclo Principal") && !i.isArchived);
+  const itemsToProcess = singleCycleItems.length > 0 ? singleCycleItems : items;
+
+  for (const item of itemsToProcess) {
     if (item.isArchived) continue;
 
     const key = item.projectId || item.project || item.id;

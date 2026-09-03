@@ -2872,7 +2872,7 @@ function renderExecutiveProjectsTable(projects) {
             ${proj.name}
           </div>
           <div style="font-size: 0.72rem; color: var(--text-muted);">
-            ${proj.phases.length} fases configuradas
+            ${proj.startDate || '—'} a ${proj.deliveryDate || '—'}
           </div>
         </td>
         <td>

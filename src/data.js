@@ -346,7 +346,12 @@ export async function deleteProjectPermanently(db, projectId, user) {
 export function aggregateProjectData(phases) {
   const projects = {};
 
-  phases.forEach(item => {
+  // Filtrar exclusivamente los proyectos de Ciclo Único (arquitectura nueva y proyectos migrados)
+  // Si en la base de datos coexisten fases antiguas y proyectos de ciclo único, ignoramos las fases viejas
+  const singleCycleItems = phases.filter(item => item.isSingleCycle === true || item.phase === 'Ciclo Principal');
+  const itemsToProcess = singleCycleItems.length > 0 ? singleCycleItems : phases;
+
+  itemsToProcess.forEach(item => {
     const groupingKey = item.projectId || (item.project || item.name || '').replace(/\s+/g, ' ').trim();
 
     if (!projects[groupingKey]) {
@@ -375,6 +380,9 @@ export function aggregateProjectData(phases) {
     }
     if (item.inferredPhase) {
       proj.inferredPhase = item.inferredPhase;
+    }
+    if (item.comment || item.comments) {
+      proj.comments = item.comment || item.comments;
     }
   });
 
