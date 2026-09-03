@@ -1269,7 +1269,7 @@ function renderProjectCard(proj, index, isArchived) {
   const commentLines = rawComments ? rawComments.split('\n').filter(Boolean) : [];
 
   return `
-  <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s; margin-bottom: 1.5rem; padding: 1.5rem;">
+  <div id="project-card-${safeId}" class="glass-card animate-fade-in ${isArchived ? 'archived-project' : ''}" style="animation-delay: ${0.07 * (index % 6)}s; margin-bottom: 1.5rem; padding: 1.5rem; max-width: 100%; overflow: hidden; box-sizing: border-box;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
       <div style="flex: 1; min-width: 280px;">
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
@@ -1471,7 +1471,7 @@ function renderProjectCard(proj, index, isArchived) {
     </div>
 
     <!-- Hidden per-project mini Gantt -->
-    <div id="gantt-panel-${safeId}" style="display:${isExpanded ? 'block' : 'none'}; overflow-x:auto; margin-top:0.5rem; border-top:1px solid var(--card-border); background:rgba(0,0,0,0.15); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg);">
+    <div id="gantt-panel-${safeId}" class="custom-scrollbar" style="display:${isExpanded ? 'block' : 'none'}; width:100%; max-width:100%; overflow-x:auto; overflow-y:hidden; margin-top:0.75rem; border-top:1px solid var(--card-border); background:rgba(2,6,23,0.4); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg); padding-bottom:0.5rem; -webkit-overflow-scrolling:touch;">
       ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]) : getWeeksForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]), projColor)}
     </div>
   </div>`;
