@@ -18,7 +18,10 @@ import {
   subscribeToLogs,
   subscribeToUsers,
   saveUserProfile,
-  deleteUserProfile
+  deleteUserProfile,
+  pauseProject,
+  resumeProject,
+  createAuditLog
 } from './data.js';
 import {
   onAuthStateChanged,
@@ -36,7 +39,7 @@ let appState = {
   projects: [],
   searchQuery: '',
   selectedParticipant: null,
-  selectedStatuses: new Set(['En curso']),
+  selectedStatuses: new Set(['En curso', 'Pausado']),
   sortOrder: 'name_asc',
   needsResort: true,
   frozenActiveIds: null,
@@ -59,10 +62,13 @@ let appState = {
   execSelectedClient: 'all',
   execHealthFilter: 'all',
   execSearchQuery: '',
+  execRoadmapMode: 'months',
+  execRoadmapHealthFilters: new Set(),
   lastAiBriefingText: '',
   initialGanttScrollDone: false,
   returnScrollPos: null,
   ganttViewMode: 'weeks', // 'weeks' | 'months'
+  miniGanttModes: {},     // [safeId]: 'weeks' | 'months'
 };
 
 // DOM Elements
@@ -128,17 +134,21 @@ function escapeHtml(str) {
 
 // Loading state
 function showLoading() {
-  projectsListEl.innerHTML = `
-    <div style="display: flex; flex-direction: column; align-items: center; padding: 4rem; gap: 1rem; color: var(--text-muted);">
-      <div class="spinner"></div>
-      <p>Conectando con Firestore...</p>
-    </div>
-  `;
-  dashboardEl.innerHTML = `
-    <div class="glass-card metric-card metric-total" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
-    <div class="glass-card metric-card metric-health" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
-    <div class="glass-card metric-card metric-progress" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
-  `;
+  if (projectsListEl) {
+    projectsListEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 4rem; gap: 1rem; color: var(--text-muted);">
+        <div class="spinner"></div>
+        <p>Conectando con Firestore...</p>
+      </div>
+    `;
+  }
+  if (dashboardEl) {
+    dashboardEl.innerHTML = `
+      <div class="glass-card metric-card metric-total" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
+      <div class="glass-card metric-card metric-health" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
+      <div class="glass-card metric-card metric-progress" style="opacity: 0.5;"><span class="metric-title">Cargando...</span><span class="metric-value">—</span></div>
+    `;
+  }
 }
 
 function cleanupSubscriptions() {
@@ -548,9 +558,21 @@ function getWorkingDaysBetween(start, end) {
 }
 
 function parseDate(str) {
-  if (!str) return null;
-  const [d, m, y] = str.split('/');
-  return new Date(+y, +m - 1, +d);
+  if (!str || typeof str !== 'string') return null;
+  const trimmed = str.trim();
+  if (trimmed.includes('-')) {
+    const parts = trimmed.split('-');
+    if (parts.length < 3) return null;
+    const dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length < 3) return null;
+    const dt = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
 }
 function weekStart(date) {
   const d = new Date(date);
@@ -732,11 +754,11 @@ window.scrollToProject = function(safeId) {
 /**
  * Calculates the position of the "today" line in a Gantt chart.
  */
-function getTodayX(weeks, labelW, colW) {
+function getTodayX(weeks, labelW, colW, isMonthsOverride = null) {
   if (!weeks || weeks.length === 0) return null;
 
   const now = new Date();
-  const isMonths = appState.ganttViewMode === 'months';
+  const isMonths = isMonthsOverride !== null ? isMonthsOverride : (appState.ganttViewMode === 'months');
   
   // Find which bucket today falls into
   const weekIdx = weeks.findIndex((w, i) => {
@@ -784,6 +806,9 @@ function renderGantt() {
   );
   
   if (!ganttEl || appState.rawPhases.length === 0) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const timeline = getGlobalTimeline();
   if (timeline.length === 0) { ganttEl.innerHTML = ''; return; }
@@ -866,20 +891,48 @@ function renderGantt() {
 
         const origPct = (origDurationDays / durationDays) * 100;
         const postPct = 100 - origPct;
-        const barInnerHtml = isPostponed ? `
+        const barContentHtml = isPostponed ? `
           <div style="position:absolute; left:0; width:${origPct}%; height:100%; background:${color}; z-index:1; border-radius:6px 0 0 6px;"></div>
-          <div style="position:absolute; left:${origPct}%; width:2px; height:100%; background:#fbbf24; z-index:3; box-shadow:0 0 6px #f59e0b;" title="Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
-          <div style="position:absolute; left:${origPct}%; width:${postPct}%; height:100%; background:repeating-linear-gradient(45deg, #f59e0b, #f59e0b 6px, #d97706 6px, #d97706 12px); z-index:1; border-radius:0 6px 6px 0;" title="Aplazamiento: +${proj.postponedDays}d"></div>
+          <div style="position:absolute; left:${origPct}%; width:2px; height:100%; background:rgba(56, 189, 248, 0.6); z-index:3; box-shadow:0 0 4px rgba(56, 189, 248, 0.4);" title="Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
+          <div style="position:absolute; left:${origPct}%; width:${postPct}%; height:100%; background:repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.22) 6px, rgba(15, 23, 42, 0.65) 6px, rgba(15, 23, 42, 0.65) 12px); border-left:1px dashed rgba(56, 189, 248, 0.5); z-index:1; border-radius:0 6px 6px 0;" title="Aplazamiento / Extensión: +${proj.postponedDays}d"></div>
         ` : phasesHtml;
+
+        const pausesHtml = (proj.pauseHistory || []).map(ph => {
+          const phStart = parseDate(ph.startDate);
+          const phEnd = parseDate(ph.endDate) || today;
+          if (!phStart || !phEnd || phStart > maxPhaseDate || phEnd < minPhaseDate) return '';
+          
+          const vStart = phStart < minPhaseDate ? minPhaseDate : phStart;
+          const vEnd = phEnd > maxPhaseDate ? maxPhaseDate : phEnd;
+          
+          let pOffsetDays = 0;
+          if (vStart > minPhaseDate) {
+            pOffsetDays = Math.max(0, getWorkingDaysBetween(minPhaseDate, vStart) - 1);
+          }
+          const pDurationDays = Math.max(1, getWorkingDaysBetween(vStart, vEnd));
+          
+          let pLeftPct = (pOffsetDays / durationDays) * 100;
+          let pWPct = (pDurationDays / durationDays) * 100;
+          if (pLeftPct + pWPct > 100) pWPct = 100 - pLeftPct;
+          
+          const pauseTitle = `⏸️ Pausa (${ph.startDate} → ${ph.endDate || 'Actualidad'})${ph.reason ? `: ${escapeHtml(ph.reason)}` : ''}`;
+          
+          return `<div style="position:absolute; left:${pLeftPct}%; width:${pWPct}%; height:100%; z-index:3; background:repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.4), rgba(245, 158, 11, 0.4) 4px, rgba(15, 23, 42, 0.75) 4px, rgba(15, 23, 42, 0.75) 8px); border-left:1px dashed rgba(245,158,11,0.8); border-right:1px dashed rgba(245,158,11,0.8); display:flex; align-items:center; justify-content:center;" title="${pauseTitle}">
+            <span style="font-size:9px; opacity:0.85; pointer-events:none;">⏸️</span>
+          </div>`;
+        }).join('');
+
+        const barInnerHtml = `${barContentHtml}${pausesHtml}`;
 
         const responsibleInitials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         
         return `<td colspan="${span}" style="padding:0.5rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
           <div style="position:relative; background:${color}33; border-radius:6px; height:30px; display:flex; align-items:center; overflow:visible; box-shadow:0 2px 8px ${color}66; margin-left:${offsetPercent}%; width:${widthPercent}%;">
             ${barInnerHtml}
-            <div style="position:relative; z-index:2; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; display:flex; align-items:center; gap:0.4rem;">
+            <div style="position:relative; z-index:4; padding:0 0.75rem; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; display:flex; align-items:center; gap:0.4rem;">
               <span>${proj.overallProgress}%</span>
               ${isPostponed ? `<span style="background:rgba(0,0,0,0.5); padding:0.05rem 0.35rem; border-radius:3px; font-size:0.65rem; color:#fef08a;">⏳ +${proj.postponedDays}d</span>` : ''}
+              ${proj.isPaused ? `<span style="background:rgba(245,158,11,0.3); border:1px solid rgba(245,158,11,0.5); padding:0.05rem 0.35rem; border-radius:3px; font-size:0.65rem; color:#fde047;">⏸️ Pausado</span>` : ''}
             </div>
             
             <div style="position:absolute; right:-10px; top:-12px; width:26px; height:26px; border-radius:50%; background:${color}; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; color:white; z-index:4; border:2px solid var(--bg-color); box-shadow:0 4px 10px rgba(0,0,0,0.4);" title="${proj.responsible || 'Sin asignar'}">
@@ -950,10 +1003,20 @@ function renderGantt() {
 
 // ─── Per-Project Mini Gantt ────────────────────────────────────────────────
 // ─── Per-Project Mini Gantt ────────────────────────────────────────────────
-function buildPhaseGanttTable(proj, timeline, projColor) {
+function buildPhaseGanttTable(proj, projColor, overrideMode = null) {
+  const safeId = proj.id.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const currentMode = overrideMode || appState.miniGanttModes[safeId] || appState.ganttViewMode || 'weeks';
+  const isMonths = currentMode === 'months';
+  
+  const timeline = isMonths 
+    ? getMonthsForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }])
+    : getWeeksForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]);
+
   if (!timeline || timeline.length === 0) return '<p style="padding:1rem; color:var(--text-muted); font-size:0.8rem;">Sin datos de fechas.</p>';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const totalCols = timeline.length;
-  const isMonths = appState.ganttViewMode === 'months';
   const COL_W = isMonths ? 100 : 80, LABEL_W = 200;
 
   const headerCells = timeline.map(d =>
@@ -1003,12 +1066,37 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
     postponedDurationDays = Math.max(1, getWorkingDaysBetween(origE, e));
   }
 
+  const miniPausesHtml = (proj.pauseHistory || []).map(ph => {
+    const phStart = parseDate(ph.startDate);
+    const phEnd = parseDate(ph.endDate) || today;
+    if (!phStart || !phEnd || phStart > e || phEnd < s) return '';
+
+    const vStart = phStart < s ? s : phStart;
+    const vEnd = phEnd > e ? e : phEnd;
+
+    let pOffsetDays = 0;
+    if (vStart > s) {
+      pOffsetDays = Math.max(0, getWorkingDaysBetween(s, vStart) - 1);
+    }
+    const pDurationDays = Math.max(1, getWorkingDaysBetween(vStart, vEnd));
+
+    let pLeftPct = (pOffsetDays / durationDays) * 100;
+    let pWPct = (pDurationDays / durationDays) * 100;
+    if (pLeftPct + pWPct > 100) pWPct = 100 - pLeftPct;
+
+    const pauseTitle = `⏸️ Pausa (${ph.startDate} → ${ph.endDate || 'Actualidad'})${ph.reason ? `: ${escapeHtml(ph.reason)}` : ''}`;
+
+    return `<div style="position:absolute; left:${pLeftPct}%; width:${pWPct}%; height:100%; z-index:4; background:repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.4), rgba(245, 158, 11, 0.4) 4px, rgba(15, 23, 42, 0.75) 4px, rgba(15, 23, 42, 0.75) 8px); border-left:1px dashed rgba(245,158,11,0.8); border-right:1px dashed rgba(245,158,11,0.8); display:flex; align-items:center; justify-content:center;" title="${pauseTitle}">
+      <span style="font-size:9px; opacity:0.85; pointer-events:none;">⏸️</span>
+    </div>`;
+  }).join('');
+
   const cells = timeline.map((_, ci) => {
     if (ci === startCol) return `<td colspan="${span}" style="padding:0.4rem 4px; border-left:1px solid rgba(255,255,255,0.04);">
       <div style="position:relative; height:30px; margin-left:${offsetPercent}%; width:${widthPercent}%;">
         ${isPostponed ? `
-          <div style="display:flex; height:100%; border-radius:6px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15);"
-               title="Compromiso Inicial: ${proj.startDate} → ${proj.originalDeliveryDate}\nNueva Fecha de Entrega: ${proj.deliveryDate} (+${proj.postponedDays} días aplazado)">
+          <div style="display:flex; height:100%; border-radius:6px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.5); border:1px solid rgba(56,189,248,0.25);"
+               title="Compromiso Inicial: ${proj.startDate} → ${proj.originalDeliveryDate}\nNueva Fecha de Entrega: ${proj.deliveryDate} (+${proj.postponedDays} días de extensión)">
             <!-- Segmento Inicial Original -->
             <div style="flex:${origDurationDays}; background:${color}; display:flex; align-items:center; justify-content:space-between; padding:0 0.55rem; font-size:0.7rem; font-weight:700; color:white; white-space:nowrap; overflow:hidden; position:relative; min-width:80px;">
               <span style="overflow:hidden; text-overflow:ellipsis;">${proj.startDate} → ${proj.originalDeliveryDate} (Meta)</span>
@@ -1016,12 +1104,12 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
             </div>
             
             <!-- Separador / Marca de Compromiso Original -->
-            <div style="width:3px; background:#fbbf24; z-index:2; box-shadow:0 0 8px #f59e0b;" title="Límite Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
+            <div style="width:2px; background:rgba(56,189,248,0.7); z-index:2; box-shadow:0 0 6px rgba(56,189,248,0.5);" title="Límite Compromiso Inicial: ${proj.originalDeliveryDate}"></div>
 
-            <!-- Segmento de Aplazamiento con Rayas de Advertencia -->
-            <div style="flex:${postponedDurationDays}; background:repeating-linear-gradient(45deg, #f59e0b, #f59e0b 8px, #d97706 8px, #d97706 16px); display:flex; align-items:center; justify-content:center; padding:0 0.45rem; font-size:0.68rem; font-weight:800; color:#18181b; white-space:nowrap; overflow:hidden; min-width:60px; text-shadow:0 1px 0 rgba(255,255,255,0.4);"
-                 title="Aplazamiento: +${proj.postponedDays} días hasta ${proj.deliveryDate}">
-              <span>⏳ +${proj.postponedDays}d (${proj.deliveryDate})</span>
+            <!-- Segmento de Aplazamiento / Extensión Suave -->
+            <div style="flex:${postponedDurationDays}; background:repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.22) 6px, rgba(15, 23, 42, 0.65) 6px, rgba(15, 23, 42, 0.65) 12px); border-left:1px dashed rgba(56, 189, 248, 0.4); display:flex; align-items:center; justify-content:center; padding:0 0.45rem; font-size:0.68rem; font-weight:600; color:#e2e8f0; white-space:nowrap; overflow:hidden; min-width:60px;"
+                 title="Extensión: +${proj.postponedDays} días hasta ${proj.deliveryDate}">
+              <span style="background:rgba(0,0,0,0.45); padding:0.1rem 0.4rem; border-radius:4px; border:1px solid rgba(56,189,248,0.2);">⏳ +${proj.postponedDays}d (${proj.deliveryDate})</span>
             </div>
           </div>
         ` : `
@@ -1031,6 +1119,7 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
             <span style="margin-left:0.5rem; background:rgba(0,0,0,0.25); padding:0.1rem 0.4rem; border-radius:4px;">${proj.overallProgress}%</span>
           </div>
         `}
+        ${miniPausesHtml}
       </div></td>`;
     if (ci > startCol && ci < startCol + span) return '';
     return `<td style="border-left:1px solid rgba(255,255,255,0.04);"></td>`;
@@ -1042,11 +1131,21 @@ function buildPhaseGanttTable(proj, timeline, projColor) {
     </td>
     ${cells}</tr>`;
 
-  const todayX = getTodayX(timeline, LABEL_W, COL_W);
+  const todayX = getTodayX(timeline, LABEL_W, COL_W, isMonths);
   const todayLine = todayX !== null ? `<div class="today-line" style="left:${todayX}; height: 100%;"></div>` : '';
 
   const totalW = LABEL_W + totalCols * COL_W;
   return `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0.85rem; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(3,11,30,0.6);">
+      <span style="font-size:0.75rem; font-weight:600; color:var(--text-muted); display:flex; align-items:center; gap:0.4rem;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Vista de Cronograma
+      </span>
+      <div style="display:flex; align-items:center; gap:0.35rem; background:rgba(0,0,0,0.3); padding:2px; border-radius:6px; border:1px solid var(--card-border);">
+        <button class="toggle-btn ${!isMonths ? 'active' : ''}" style="height:22px; padding:0.15rem 0.55rem; font-size:0.68rem;" onclick="window.setProjectGanttMode('${safeId}', 'weeks')">Semanas</button>
+        <button class="toggle-btn ${isMonths ? 'active' : ''}" style="height:22px; padding:0.15rem 0.55rem; font-size:0.68rem;" onclick="window.setProjectGanttMode('${safeId}', 'months')">Meses</button>
+      </div>
+    </div>
     <div style="position:relative; width:100%; min-width:${totalW}px;">
       ${todayLine}
       <table style="border-collapse:collapse; width:100%; table-layout:fixed;">
@@ -1280,7 +1379,11 @@ function renderProjectCard(proj, index, isArchived) {
           <span class="exec-pill exec-pill-purple" style="font-size: 0.75rem; font-weight: 600;">
             🎯 Etapa IA: ${proj.inferredPhase || 'Levantamiento'}
           </span>
-          ${healthBadge}
+          ${proj.isPaused ? `
+            <span class="exec-pill exec-pill-yellow" style="font-size: 0.75rem; font-weight: 700; background:rgba(245,158,11,0.2); color:#fde047; border:1px solid rgba(245,158,11,0.4);" title="Proyecto en pausa temporal${proj.activePauseDays > 0 ? ` (${proj.activePauseDays}d transcurridos)` : ''}">
+              ⏸️ En Pausa ${proj.activePauseDays > 0 ? `(+${proj.activePauseDays}d)` : ''}
+            </span>
+          ` : healthBadge}
         </div>
 
         <div style="display: flex; align-items: center; gap: 1.25rem; color: var(--text-muted); font-size: 0.85rem; flex-wrap: wrap; margin-top: 0.35rem;">
@@ -1321,6 +1424,13 @@ function renderProjectCard(proj, index, isArchived) {
                 ⏳ +${proj.postponedDays} días aplazado
               </span>
             ` : ''}
+
+            <!-- Badge de Días en Pausa si existe -->
+            ${proj.totalPausedDays > 0 ? `
+              <span class="exec-pill" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; background: rgba(245, 158, 11, 0.12); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.3);" title="Días totales acumulados en pausa: ${proj.totalPausedDays}d (extendiendo la fecha de entrega)">
+                ⏸️ +${proj.totalPausedDays}d en pausa
+              </span>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -1329,6 +1439,16 @@ function renderProjectCard(proj, index, isArchived) {
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
           ${canEdit && !isArchived ? `
+            <!-- Botón Pausar / Reanudar -->
+            <button onclick="window.toggleProjectPause('${proj.id}')"
+                    style="font-size: 0.76rem; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s; background: ${proj.isPaused ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.05)'}; color: ${proj.isPaused ? '#fde047' : '#cbd5e1'}; border: 1px solid ${proj.isPaused ? 'rgba(245, 158, 11, 0.5)' : 'rgba(255, 255, 255, 0.1)'}; font-weight: 600;"
+                    title="${proj.isPaused ? 'Reanudar proyecto' : 'Pausar proyecto temporalmente'}">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                ${proj.isPaused ? `<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />` : `<rect x="6" y="4" width="4" height="16" fill="currentColor" /><rect x="14" y="4" width="4" height="16" fill="currentColor" />`}
+              </svg>
+              ${proj.isPaused ? 'Reanudar' : 'Pausar'}
+            </button>
+
             <button onclick="window.openPostponeModal('${proj.id}')"
                     class="postpone-btn"
                     title="Aplazar fecha de entrega manteniendo el registro de la meta inicial">
@@ -1378,7 +1498,7 @@ function renderProjectCard(proj, index, isArchived) {
       <!-- Fila 1: Avance Real (Estimado / Reportado) -->
       <div class="metric-row">
         <div class="metric-header">
-          <span style="display: flex; align-items: center; gap: 0.4rem; color: #cbd5e1; font-weight: 600;">
+          <span style="display: flex; align-items: center; gap: 0.4rem; color: #cbd5e1; font-weight: 600; flex-wrap: wrap;">
             <span style="color: #34d399;">📈</span>
             <span>Avance Real</span>
             ${canEdit && !isArchived ? `
@@ -1391,6 +1511,12 @@ function renderProjectCard(proj, index, isArchived) {
                 ${proj.realProgress}%
               </span>
               <span style="font-size: 0.68rem; color: #64748b;">(clic para editar)</span>
+              <button class="ai-estimate-btn" 
+                      id="ai-estimate-btn-${safeId}"
+                      onclick="window.handleAIEstimateProgress('${proj.id}', this)"
+                      title="Analizar comentarios e historial con Gemini para estimar el % de avance real automáticamente">
+                <span class="ai-sparkle">✨</span> Estimar con IA
+              </button>
             ` : `
               <span class="real-progress-badge">${proj.realProgress}%</span>
             `}
@@ -1472,7 +1598,7 @@ function renderProjectCard(proj, index, isArchived) {
 
     <!-- Hidden per-project mini Gantt -->
     <div id="gantt-panel-${safeId}" class="custom-scrollbar" style="display:${isExpanded ? 'block' : 'none'}; width:100%; max-width:100%; overflow-x:auto; overflow-y:hidden; margin-top:0.75rem; border-top:1px solid var(--card-border); background:rgba(2,6,23,0.4); border-radius:0 0 var(--border-radius-lg) var(--border-radius-lg); padding-bottom:0.5rem; -webkit-overflow-scrolling:touch;">
-      ${buildPhaseGanttTable(proj, appState.ganttViewMode === 'months' ? getMonthsForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]) : getWeeksForPhases([{ startDate: proj.startDate, endDate: proj.deliveryDate }]), projColor)}
+      ${buildPhaseGanttTable(proj, projColor)}
     </div>
   </div>`;
 }
@@ -1589,6 +1715,18 @@ window.toggleProjectGantt = function(safeId) {
   }
 };
 
+window.setProjectGanttMode = function(safeId, mode) {
+  appState.miniGanttModes[safeId] = mode;
+  const proj = appState.projects.find(p => p.id.replace(/[^a-z0-9]/gi, '-').toLowerCase() === safeId);
+  if (!proj) return;
+  const globalIndex = appState.projects.findIndex(p => p.id === proj.id);
+  const projColor = GANTT_COLORS[globalIndex % GANTT_COLORS.length];
+  const panel = document.getElementById(`gantt-panel-${safeId}`);
+  if (panel) {
+    panel.innerHTML = buildPhaseGanttTable(proj, projColor, mode);
+  }
+};
+
 window.handleQuickCommentSubmit = async function(e, projectId, safeId) {
   e.preventDefault();
   const input = document.getElementById(`comment-input-${safeId}`);
@@ -1654,6 +1792,145 @@ window.handleRealProgressBlur = async function(el, projectId) {
   }
 };
 
+function showAIFeedbackToast(projectName, progress, phase, justification) {
+  const existing = document.getElementById('aiFeedbackToast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'aiFeedbackToast';
+  toast.className = 'ai-feedback-toast';
+  toast.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.35rem;">
+      <span style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 0.4rem;">
+        ✨ Avance Estimado por IA
+      </span>
+      <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+    </div>
+    <div style="font-size: 0.85rem; color: #f1f5f9;">
+      <strong>${projectName}</strong> actualizado a 
+      <span style="color: #34d399; font-weight: 800; font-size: 0.95rem;">${progress}%</span> 
+      <span style="color: #c084fc; font-size: 0.75rem; font-weight: 600;">(Etapa: ${phase})</span>
+    </div>
+    ${justification ? `<div style="font-size: 0.75rem; color: #cbd5e1; font-style: italic; background: rgba(0,0,0,0.3); padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 2px solid #38bdf8;">"${justification}"</div>` : ''}
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    if (toast && toast.parentElement) {
+      toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(15px)';
+      setTimeout(() => toast.remove(), 400);
+    }
+  }, 6000);
+}
+
+window.handleAIEstimateProgress = async function(projectId, btnEl) {
+  const apiKey = localStorage.getItem('geminiApiKey') || localStorage.getItem('gemini_api_key');
+  if (!apiKey) {
+    alert("Para usar la estimación inteligente con Gemini AI, debes configurar tu API Key en Ajustes.");
+    openSettingsModal();
+    return;
+  }
+
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  const originalHtml = btnEl.innerHTML;
+  btnEl.disabled = true;
+  btnEl.innerHTML = `<span class="ai-spinner"></span> Estimando...`;
+
+  try {
+    const rawComments = (proj.phases.map(p => p.comment).filter(Boolean).join('\n') || proj.comment || proj.comments || '').trim();
+
+    const prompt = `
+Eres un Director de Proyectos y auditor técnico de avance de proyectos en una PMO tecnológica.
+Tu tarea es estimar con precisión y rigor profesional el **porcentaje de avance real** (un número entero de 0 a 100) del siguiente proyecto, evaluando sus entregables, bloqueos y comentarios.
+
+DATOS DEL PROYECTO:
+- Nombre: "${proj.name}"
+- Cliente: "${proj.client}"
+- Responsable: "${proj.responsible || 'No asignado'}"
+- Rango de Fechas: ${proj.startDate || '—'} hasta ${proj.deliveryDate || '—'}
+- Tiempo de Calendario Consumido: ${proj.timeProgress}%
+- Etapa Actual Reportada: "${proj.inferredPhase || 'Levantamiento'}"
+- Avance Real Actual registrado: ${proj.realProgress}%
+
+HISTORIAL CRONOLÓGICO DE ACTUALIZACIONES (LOGROS, BLOQUEOS, OBSERVACIONES):
+${rawComments ? rawComments : 'No hay comentarios registrados.'}
+
+CRITERIOS DE ESTIMACIÓN:
+1. El avance real mide el progreso técnico y de entregables construidos, NO solo el paso de los días.
+2. Si está en fase inicial de levantamiento o diagnóstico:
+   - Recién iniciando: 5% - 10%.
+   - Levantamiento avanzado / con observaciones o informes enviados al cliente a la espera de respuesta: 15% - 25%.
+3. Si está en desarrollo o construcción activa: 30% - 75% según módulos terminados reportados.
+4. Si está en testing / QA / corrección de observaciones: 75% - 90%.
+5. Si está en fase de entrega final o despliegue: 90% - 99% (o 100% si está totalmente entregado).
+6. Si hay bloqueos reportados (ej: esperando tablas del cliente, accesos pendientes), mantén una estimación prudente sin inflar el porcentaje.
+7. Determina también la etapa más adecuada ("Levantamiento", "Diseño", "Desarrollo", "Testing/QA", "Entrega").
+
+Responde ÚNICAMENTE un objeto JSON válido (sin etiquetas markdown ni texto fuera del JSON) con la siguiente estructura exacta:
+{
+  "estimatedProgress": <número entero entre 0 y 100>,
+  "inferredPhase": "<Nombre de la etapa>",
+  "justification": "<Explicación concisa en español de máximo 20 palabras>"
+}
+`;
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+    let text = result.response.text().trim();
+
+    if (text.startsWith('```json')) {
+      text = text.replace(/^```json/, '').replace(/```$/, '').trim();
+    } else if (text.startsWith('```')) {
+      text = text.replace(/^```/, '').replace(/```$/, '').trim();
+    }
+
+    const data = JSON.parse(text);
+    const newProgress = Math.min(100, Math.max(0, Math.round(Number(data.estimatedProgress))));
+    const newPhase = data.inferredPhase || proj.inferredPhase || 'En curso';
+    const oldProgress = proj.realProgress;
+
+    // Optimistic update
+    proj.realProgress = newProgress;
+    proj.overallProgress = newProgress;
+    proj.inferredPhase = newPhase;
+    proj.currentPhase = newPhase;
+    proj.progressGap = proj.timeProgress - newProgress;
+
+    // Persist to Firestore
+    await updateProjectMeta(
+      db,
+      projectId,
+      proj.name,
+      proj.responsible,
+      proj.client,
+      proj.startDate,
+      proj.deliveryDate,
+      proj.state,
+      newPhase,
+      newProgress
+    );
+
+    await createAuditLog(
+      db,
+      appState.currentUser,
+      'IA_ESTIMATE_PROGRESS',
+      `IA estimó avance real de "${proj.name}" de ${oldProgress}% a ${newProgress}% (${data.justification || ''})`
+    );
+
+    showAIFeedbackToast(proj.name, newProgress, newPhase, data.justification);
+    render();
+  } catch (error) {
+    console.error("Error al estimar avance con IA:", error);
+    alert("Hubo un error al consultar a Gemini AI: " + (error.message || "Verifica tu API Key o conexión"));
+    btnEl.disabled = false;
+    btnEl.innerHTML = originalHtml;
+  }
+};
+
 window.toggleProjectCompleted = async function(projectId, newState) {
   const proj = appState.projects.find(p => p.id === projectId);
   if (!proj) return;
@@ -1701,6 +1978,58 @@ window.openPostponeModal = function(projectId) {
   }
 
   modal?.classList.add('active');
+};
+
+window.openPauseModal = function(projectId) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  const modal = document.getElementById('pauseModal');
+  const errorEl = document.getElementById('pauseError');
+  if (errorEl) errorEl.style.display = 'none';
+
+  document.getElementById('pauseProjectId').value = proj.id;
+  document.getElementById('pauseProjectName').textContent = proj.name;
+  document.getElementById('pauseReason').value = '';
+
+  const pauseDateInput = document.getElementById('pauseStartDate');
+  if (pauseDateInput) {
+    if (appState.fpPauseStart) {
+      appState.fpPauseStart.destroy();
+    }
+    appState.fpPauseStart = flatpickr("#pauseStartDate", {
+      altInput: true,
+      altFormat: "d/m/Y",
+      dateFormat: "d/m/Y",
+      defaultDate: new Date(),
+      onDayCreate: (dObj, dStr, fp, dayElem) => {
+        const dow = dayElem.dateObj.getDay();
+        if (dow === 0 || dow === 6) dayElem.classList.add('flatpickr-weekend');
+      }
+    });
+  }
+
+  modal?.classList.add('active');
+  setTimeout(() => { document.getElementById('pauseReason')?.focus(); }, 100);
+};
+
+window.toggleProjectPause = async function(projectId) {
+  const proj = appState.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  if (proj.isPaused) {
+    const daysMsg = proj.activePauseDays > 0 ? ` (ha estado en pausa por ${proj.activePauseDays} días)` : '';
+    if (confirm(`¿Deseas reanudar el proyecto "${proj.name}"?${daysMsg}\n\nLos días transcurridos se sumarán a la fecha final de entrega.`)) {
+      try {
+        await resumeProject(db, projectId, appState.currentUser);
+      } catch (err) {
+        console.error("Error al reanudar proyecto:", err);
+        alert("Error al reanudar el proyecto.");
+      }
+    }
+  } else {
+    window.openPauseModal(projectId);
+  }
 };
 
 window.handleMetaBlur = async function(el, projectId, field) {
@@ -2064,6 +2393,52 @@ function setupEventListeners() {
     }
   });
 
+  // Pause Project Modal Listeners
+  const closePauseModal = () => {
+    document.getElementById('pauseModal')?.classList.remove('active');
+  };
+
+  document.getElementById('closePauseModalBtn')?.addEventListener('click', closePauseModal);
+  document.getElementById('cancelPauseBtn')?.addEventListener('click', closePauseModal);
+  document.getElementById('pauseModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('pauseModal')) closePauseModal();
+  });
+
+  document.getElementById('pauseForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const projectId = document.getElementById('pauseProjectId').value;
+    const startDate = document.getElementById('pauseStartDate')?.value || '';
+    const reason = document.getElementById('pauseReason').value.trim();
+    const errorEl = document.getElementById('pauseError');
+
+    if (!reason) {
+      if (errorEl) {
+        errorEl.textContent = 'Por favor ingresa el motivo de la pausa.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Pausando...';
+
+    try {
+      await pauseProject(db, projectId, reason, appState.currentUser, startDate);
+      closePauseModal();
+    } catch (err) {
+      console.error("Error al pausar proyecto:", err);
+      if (errorEl) {
+        errorEl.textContent = 'Ocurrió un error al pausar el proyecto.';
+        errorEl.style.display = 'block';
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+
   const backupBtn = document.getElementById('backupBtn');
   if (backupBtn) {
     backupBtn.addEventListener('click', () => {
@@ -2251,6 +2626,15 @@ function renderExecutiveView() {
   const projects = getExecutiveProjects();
 
   renderExecutiveCustomKPIs(projects);
+  try {
+    renderExecutiveRoadmap(projects);
+  } catch (err) {
+    console.error("Error al renderizar el Roadmap Ejecutivo:", err);
+    const roadmapContainer = document.getElementById('execRoadmapContainer');
+    if (roadmapContainer) {
+      roadmapContainer.innerHTML = `<div style="padding:1.5rem; text-align:center; color:#f87171; font-size:0.85rem;">Error al renderizar el Roadmap: ${err.message}</div>`;
+    }
+  }
   renderExecutiveScatterPlot(projects);
   renderExecutiveKPIs(projects);
   renderExecutiveRisks(projects);
@@ -2264,7 +2648,9 @@ function renderExecutiveCustomKPIs(projects) {
   if (!container) return;
 
   const total = projects.length;
-  const completed = projects.filter(p => p.status === 'Completado').length;
+  const inProgress = projects.filter(p => p.status === 'En curso' || (!p.isPaused && p.health !== 'completed' && p.status !== 'Completado')).length;
+  const paused = projects.filter(p => p.status === 'Pausado' || p.health === 'paused' || p.isPaused).length;
+  const completed = projects.filter(p => (p.status === 'Completado' || p.health === 'completed') && !p.isPaused).length;
 
   // SLA = percentage of projects not delayed
   const delayed = projects.filter(p => p.health === 'delayed').length;
@@ -2296,7 +2682,7 @@ function renderExecutiveCustomKPIs(projects) {
     return count;
   };
 
-  const completedProjects = projects.filter(p => p.status === 'Completado');
+  const completedProjects = projects.filter(p => (p.status === 'Completado' || p.health === 'completed') && !p.isPaused);
   let totalDays = 0;
   let completedWithDates = 0;
   completedProjects.forEach(p => {
@@ -2313,7 +2699,7 @@ function renderExecutiveCustomKPIs(projects) {
     // Fallback to active projects planned duration
     let activeDays = 0;
     let activeWithDates = 0;
-    projects.filter(p => p.status !== 'Completado').forEach(p => {
+    projects.filter(p => p.status !== 'Completado' && p.health !== 'completed').forEach(p => {
       const days = calculateBusinessDays(p.startDate, p.deliveryDate);
       if (days !== null) {
         activeDays += days;
@@ -2358,38 +2744,643 @@ function renderExecutiveCustomKPIs(projects) {
       <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Registrados en cartera</div>
     </div>
 
-    <!-- Card 2: Cantidad de proyectos completados -->
+    <!-- Card 2: Proyectos en Curso -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Proyectos en Curso</div>
+      <div style="font-size: 2rem; font-weight: 800; color: var(--exec-soft-green);">${inProgress}</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Activos en ejecución</div>
+    </div>
+
+    <!-- Card 3: Proyectos en Pausa -->
+    <div class="exec-card" style="padding: 1.25rem;">
+      <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Proyectos en Pausa</div>
+      <div style="font-size: 2rem; font-weight: 800; color: #94a3b8;">${paused}</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Detenidos temporalmente</div>
+    </div>
+
+    <!-- Card 4: Proyectos Completados -->
     <div class="exec-card" style="padding: 1.25rem;">
       <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Proyectos Completados</div>
       <div style="font-size: 2rem; font-weight: 800; color: var(--exec-soft-blue);">${completed}</div>
       <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Finalizados con 100% de avance</div>
     </div>
 
-    <!-- Card 3: SLA -->
+    <!-- Card 5: SLA -->
     <div class="exec-card" style="padding: 1.25rem;">
       <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Nivel de SLA</div>
       <div style="font-size: 2rem; font-weight: 800; color: ${slaVal >= 90 ? 'var(--exec-soft-green)' : (slaVal >= 80 ? 'var(--exec-soft-amber)' : 'var(--exec-soft-coral)')};">${slaVal}%</div>
-      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Proporción de proyectos sin retrasos</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Proporción sin retrasos</div>
     </div>
 
-    <!-- Card 4: Días laborales promedio -->
+    <!-- Card 6: Días laborales promedio -->
     <div class="exec-card" style="padding: 1.25rem;">
       <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Días Hábiles Promedio</div>
       <div style="font-size: 2rem; font-weight: 800; color: var(--text-main);">${avgVal} <span style="font-size: 1rem; font-weight: 400; color: var(--text-muted);">días</span></div>
       <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${avgLabel}</div>
     </div>
+  `;
 
-    <!-- Card 5: Recomendación -->
-    <div class="exec-card" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; border-left: 3px solid ${recColor};">
-      <div>
-        <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Recomendación PMO</div>
-        <div style="font-size: 0.78rem; line-height: 1.4; color: var(--text-main); font-style: italic;">
-          ${recIcon} "${recommendation}"
+  // Banner full-width para la Recomendación PMO
+  const pmoContainer = document.getElementById('execPmoRecommendationContainer');
+  if (pmoContainer) {
+    pmoContainer.innerHTML = `
+      <div class="exec-card" style="padding: 0.95rem 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left: 4px solid ${recColor}; background: linear-gradient(90deg, rgba(3, 11, 30, 0.85), rgba(15, 23, 42, 0.65)); box-shadow: 0 4px 18px rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 0.85rem; flex: 1; min-width: 0;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0;">
+            ${recIcon}
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.15rem;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">Recomendación PMO Estratégica</span>
+              <span class="exec-pill" style="font-size: 0.65rem; padding: 0.1rem 0.45rem; background: rgba(255,255,255,0.04); color: ${recColor}; border: 1px solid ${recColor}44;">Diagnóstico Inteligente</span>
+            </div>
+            <div style="font-size: 0.88rem; color: var(--text-main); font-weight: 500; line-height: 1.4;">
+              "${recommendation}"
+            </div>
+          </div>
         </div>
+      </div>
+    `;
+  }
+}
+
+// ─── Executive Portfolio Roadmap ───────────────────────────────────────────
+function quarterStart(date) {
+  const d = new Date(date);
+  const qMonth = Math.floor(d.getMonth() / 3) * 3;
+  return new Date(d.getFullYear(), qMonth, 1, 0, 0, 0, 0);
+}
+
+function quarterLabel(date) {
+  const q = Math.floor(date.getMonth() / 3) + 1;
+  const y = String(date.getFullYear()).substring(2);
+  return `Q${q} '${y}`;
+}
+
+function getNextRoadmapBucket(d, mode) {
+  const next = new Date(d);
+  if (mode === 'quarters') {
+    next.setMonth(next.getMonth() + 3);
+  } else if (mode === 'weeks') {
+    next.setDate(next.getDate() + 7);
+  } else {
+    next.setMonth(next.getMonth() + 1);
+  }
+  return next;
+}
+
+function getRoadmapTimeline(projects, mode) {
+  let allDates = [];
+  projects.forEach(p => {
+    const s = parseDate(p.startDate);
+    const e = parseDate(p.deliveryDate || p.endDate);
+    if (s && !isNaN(s.getTime())) allDates.push(s);
+    if (e && !isNaN(e.getTime())) allDates.push(e);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  allDates.push(today);
+
+  // Aseguramos margen suficiente antes y después de 'Hoy' para que la línea roja
+  // siempre pueda centrarse horizontalmente en el viewport sin topar con los extremos.
+  const bufferBefore = new Date(today);
+  const bufferAfter = new Date(today);
+
+  if (mode === 'quarters') {
+    bufferBefore.setMonth(bufferBefore.getMonth() - 15); // ~5 trimestres antes
+    bufferAfter.setMonth(bufferAfter.getMonth() + 15);  // ~5 trimestres después
+  } else if (mode === 'weeks') {
+    bufferBefore.setDate(bufferBefore.getDate() - 98);   // ~14 semanas antes
+    bufferAfter.setDate(bufferAfter.getDate() + 98);    // ~14 semanas después
+  } else { // 'months'
+    bufferBefore.setMonth(bufferBefore.getMonth() - 8);  // ~8 meses antes
+    bufferAfter.setMonth(bufferAfter.getMonth() + 8);   // ~8 meses después
+  }
+
+  allDates.push(bufferBefore);
+  allDates.push(bufferAfter);
+
+  const validTimes = allDates.map(d => d.getTime()).filter(t => !isNaN(t));
+  if (validTimes.length === 0) return [];
+
+  const rawMin = new Date(Math.min(...validTimes));
+  const rawMax = new Date(Math.max(...validTimes));
+
+  const timeline = [];
+  if (mode === 'quarters') {
+    const minBucket = quarterStart(rawMin);
+    const maxBucket = quarterStart(rawMax);
+    const cursor = new Date(minBucket);
+    while (cursor <= maxBucket) {
+      timeline.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 3);
+    }
+    timeline.push(new Date(cursor)); // buffer
+  } else if (mode === 'weeks') {
+    const minBucket = weekStart(rawMin);
+    const maxBucket = weekStart(rawMax);
+    const cursor = new Date(minBucket);
+    while (cursor <= maxBucket) {
+      timeline.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    timeline.push(new Date(cursor)); // buffer
+  } else { // 'months'
+    const minBucket = monthStart(rawMin);
+    const maxBucket = monthStart(rawMax);
+    const cursor = new Date(minBucket);
+    while (cursor <= maxBucket) {
+      timeline.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    timeline.push(new Date(cursor)); // buffer
+  }
+  return timeline;
+}
+
+function getRoadmapTodayPos(timeline, labelW, colW, mode) {
+  if (!timeline || timeline.length === 0) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const todayTime = now.getTime();
+  const firstTime = timeline[0].getTime();
+  const lastBucket = timeline[timeline.length - 1];
+  const endOfLastBucket = getNextRoadmapBucket(lastBucket, mode).getTime();
+
+  if (todayTime < firstTime || todayTime > endOfLastBucket) return null;
+
+  const bucketIdx = timeline.findIndex((w, i) => {
+    const nextB = timeline[i + 1] || getNextRoadmapBucket(w, mode);
+    return todayTime >= w.getTime() && todayTime < nextB.getTime();
+  });
+
+  if (bucketIdx === -1) return null;
+
+  const curBucket = timeline[bucketIdx];
+  const nxtBucket = timeline[bucketIdx + 1] || getNextRoadmapBucket(curBucket, mode);
+  
+  let fraction = 0;
+  if (mode === 'quarters' || mode === 'months') {
+    const totalWorking = Math.max(1, getWorkingDaysBetween(curBucket, new Date(nxtBucket.getTime() - 86400000)));
+    const currentWorking = getWorkingDaysBetween(curBucket, now);
+    fraction = Math.max(0, Math.min(1, currentWorking / totalWorking));
+  } else {
+    const dow = now.getDay();
+    if (dow === 0) fraction = 0;
+    else if (dow === 6) fraction = 1;
+    else fraction = (dow - 1) / 5;
+  }
+
+  const totalW = labelW + timeline.length * colW;
+  const currentX = labelW + (bucketIdx * colW) + (fraction * colW);
+  return {
+    percent: (currentX / totalW) * 100,
+    px: currentX
+  };
+}
+
+function renderExecutiveRoadmap(projects) {
+  const container = document.getElementById('execRoadmapContainer');
+  if (!container) return;
+
+  const mode = appState.execRoadmapMode || 'months';
+  const projectsWithDates = projects.filter(p => {
+    const s = parseDate(p.startDate);
+    const e = parseDate(p.deliveryDate || p.endDate);
+    return s && !isNaN(s.getTime()) && e && !isNaN(e.getTime());
+  });
+
+  if (projectsWithDates.length === 0) {
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: var(--text-main);">Roadmap Estratégico de Portafolio</h3>
+      </div>
+      <div style="padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+        No hay proyectos con fechas definidas de inicio y entrega para graficar en esta cartera.
+      </div>
+    `;
+    return;
+  }
+
+  const timeline = getRoadmapTimeline(projectsWithDates, mode);
+  if (!timeline || timeline.length === 0) {
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: var(--text-main);">Roadmap Estratégico de Portafolio</h3>
+      </div>
+      <div style="padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+        No fue posible calcular la escala temporal para esta cartera.
+      </div>
+    `;
+    return;
+  }
+
+  const COL_W = mode === 'quarters' ? 140 : (mode === 'weeks' ? 75 : 95);
+  const LABEL_W = 270;
+  const totalCols = timeline.length;
+  const totalW = LABEL_W + totalCols * COL_W;
+
+  const headerCells = timeline.map(d => {
+    let label = '';
+    if (mode === 'quarters') label = quarterLabel(d);
+    else if (mode === 'weeks') label = weekLabel(d);
+    else label = monthLabel(d);
+
+    return `<th style="min-width:${COL_W}px; max-width:${COL_W}px; padding:0.6rem 0.5rem; font-size:0.72rem; font-weight:600; color:#94a3b8; text-align:center; background:rgba(3,11,30,0.85); border-left:1px solid rgba(56,189,248,0.15); border-bottom:1px solid rgba(56,189,248,0.25); white-space:nowrap;">${label}</th>`;
+  }).join('');
+
+  const todayPos = getRoadmapTodayPos(timeline, LABEL_W, COL_W, mode);
+  const todayLineHtml = todayPos ? `
+    <div class="exec-roadmap-today-line" style="position: absolute; left: ${todayPos.px}px; top: 0; bottom: 0; width: 2px; background: var(--exec-soft-coral); z-index: 6; pointer-events: none; box-shadow: 0 0 10px rgba(239, 68, 68, 0.75);">
+      <div style="position: sticky; top: 0; transform: translateX(-50%); background: var(--exec-soft-coral); color: white; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.06em; text-transform: uppercase; box-shadow: 0 2px 6px rgba(0,0,0,0.5); white-space: nowrap; width: fit-content; margin: 2px auto 0;">HOY</div>
+    </div>
+  ` : '';
+
+  const getRoadmapHealthCategory = (p) => {
+    if (p.health === 'paused' || p.isPaused || p.status === 'Pausado') return 'paused';
+    if ((p.health === 'completed' || p.status === 'Completado') && !p.isPaused) return 'completed';
+    if (p.health === 'delayed') return 'delayed';
+    if (p.health === 'at_risk') return 'at_risk';
+    return 'on_track';
+  };
+
+  const countOnTrack = projectsWithDates.filter(p => getRoadmapHealthCategory(p) === 'on_track').length;
+  const countAtRisk = projectsWithDates.filter(p => getRoadmapHealthCategory(p) === 'at_risk').length;
+  const countDelayed = projectsWithDates.filter(p => getRoadmapHealthCategory(p) === 'delayed').length;
+  const countPaused = projectsWithDates.filter(p => getRoadmapHealthCategory(p) === 'paused').length;
+  const countCompleted = projectsWithDates.filter(p => getRoadmapHealthCategory(p) === 'completed').length;
+
+  if (!(appState.execRoadmapHealthFilters instanceof Set)) {
+    appState.execRoadmapHealthFilters = new Set();
+  }
+  const activeFilters = appState.execRoadmapHealthFilters;
+  const isFilterActive = activeFilters.size > 0;
+
+  let filteredProjects = projectsWithDates;
+  if (isFilterActive) {
+    filteredProjects = filteredProjects.filter(p => activeFilters.has(getRoadmapHealthCategory(p)));
+  }
+
+  const rowsHtml = filteredProjects.map(proj => {
+    const s = parseDate(proj.startDate);
+    const e = parseDate(proj.deliveryDate || proj.endDate);
+    if (!s || !e) return '';
+
+    const startBucket = mode === 'quarters' ? quarterStart(s) : (mode === 'weeks' ? weekStart(s) : monthStart(s));
+    const endBucket = mode === 'quarters' ? quarterStart(e) : (mode === 'weeks' ? weekStart(e) : monthStart(e));
+
+    let startCol = timeline.findIndex(d => d.getTime() === startBucket.getTime());
+    let endCol = timeline.findIndex(d => d.getTime() === endBucket.getTime());
+    if (startCol === -1) {
+      if (startBucket < timeline[0]) startCol = 0;
+      else startCol = timeline.length - 1;
+    }
+    if (endCol === -1) {
+      if (endBucket >= timeline[timeline.length - 1]) endCol = totalCols - 1;
+      else endCol = Math.max(0, startCol);
+    }
+    if (endCol < startCol) endCol = startCol;
+
+    const span = Math.max(1, endCol - startCol + 1);
+
+    const spanStart = timeline[startCol];
+    const spanEndBucket = timeline[endCol];
+    const spanNextBucket = timeline[endCol + 1] || getNextRoadmapBucket(spanEndBucket, mode);
+    const spanEndDate = new Date(spanNextBucket.getTime() - 86400000);
+    const totalSpanWorkingDays = Math.max(1, getWorkingDaysBetween(spanStart, spanEndDate));
+
+    let offsetDays = 0;
+    if (s > spanStart) {
+      offsetDays = Math.max(0, getWorkingDaysBetween(spanStart, s) - 1);
+    }
+    const durationDays = Math.max(1, getWorkingDaysBetween(s, e));
+
+    let offsetPercent = (offsetDays / totalSpanWorkingDays) * 100;
+    let widthPercent = (durationDays / totalSpanWorkingDays) * 100;
+    if (widthPercent + offsetPercent > 100) widthPercent = Math.max(2, 100 - offsetPercent);
+
+    let barGradient = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
+    let borderColor = 'rgba(16, 185, 129, 0.4)';
+    let healthColor = 'var(--exec-soft-green)';
+    let healthPillClass = 'exec-pill-green';
+
+    if (proj.health === 'completed' || proj.status === 'Completado') {
+      barGradient = 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)';
+      borderColor = 'rgba(59, 130, 246, 0.4)';
+      healthColor = 'var(--exec-soft-blue)';
+      healthPillClass = 'exec-pill-blue';
+    } else if (proj.health === 'paused' || proj.isPaused || proj.status === 'Pausado') {
+      barGradient = 'repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.4), rgba(245, 158, 11, 0.4) 6px, rgba(15, 23, 42, 0.8) 6px, rgba(15, 23, 42, 0.8) 12px)';
+      borderColor = 'rgba(245, 158, 11, 0.5)';
+      healthColor = '#94a3b8';
+      healthPillClass = 'exec-pill-amber';
+    } else if (proj.health === 'delayed') {
+      barGradient = 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)';
+      borderColor = 'rgba(239, 68, 68, 0.4)';
+      healthColor = 'var(--exec-soft-coral)';
+      healthPillClass = 'exec-pill-coral';
+    } else if (proj.health === 'at_risk') {
+      barGradient = 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)';
+      borderColor = 'rgba(245, 158, 11, 0.4)';
+      healthColor = 'var(--exec-soft-amber)';
+      healthPillClass = 'exec-pill-amber';
+    }
+
+    const origE = parseDate(proj.originalDeliveryDate);
+    const isPostponed = origE && e && e > origE && (proj.postponedDays > 0);
+    let origDurationDays = durationDays;
+    let postponedDurationDays = 0;
+    if (isPostponed) {
+      origDurationDays = Math.max(1, getWorkingDaysBetween(s, origE));
+      postponedDurationDays = Math.max(1, getWorkingDaysBetween(origE, e));
+    }
+
+    const origPct = (origDurationDays / durationDays) * 100;
+    const postPct = Math.max(0, 100 - origPct);
+
+    const tooltipText = `${proj.name} (${proj.client})\nResponsable: ${proj.responsible || 'Sin asignar'}\nSalud: ${proj.healthLabel}\nFase Actual: ${proj.currentPhase || 'En curso'}\nAvance Real: ${proj.realProgress ?? proj.overallProgress}%\nTiempo Consumido: ${proj.timeProgress}%\nPlazo: ${proj.startDate} → ${proj.deliveryDate}${proj.postponedDays > 0 ? ` (+${proj.postponedDays}d aplazado)` : ''}`;
+
+    const cells = timeline.map((_, ci) => {
+      if (ci === startCol) {
+        return `
+          <td colspan="${span}" style="padding: 0.45rem 4px; border-left: 1px solid rgba(255,255,255,0.04);">
+            <div class="exec-roadmap-bar-wrap" style="margin-left: ${offsetPercent}%; width: ${widthPercent}%; border: 1px solid ${borderColor}; box-shadow: 0 2px 10px rgba(0,0,0,0.35);"
+                 onclick="window.highlightProjectInMatrix('${escapeHtml(proj.name)}')"
+                 title="${escapeHtml(tooltipText)}">
+              
+              <!-- Barra principal -->
+              ${isPostponed ? `
+                <div style="position: absolute; left: 0; width: ${origPct}%; height: 100%; background: ${barGradient}; border-radius: 7px 0 0 7px;"></div>
+                <div style="position: absolute; left: ${origPct}%; width: 2px; height: 100%; background: rgba(56, 189, 248, 0.8); z-index: 3; box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);" title="Meta Inicial: ${proj.originalDeliveryDate}"></div>
+                <div style="position: absolute; left: ${origPct}%; width: ${postPct}%; height: 100%; background: repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.25) 5px, rgba(15, 23, 42, 0.7) 5px, rgba(15, 23, 42, 0.7) 10px); border-left: 1px dashed rgba(56, 189, 248, 0.5); border-radius: 0 7px 7px 0;" title="Aplazamiento: +${proj.postponedDays}d"></div>
+              ` : `
+                <div style="position: absolute; left: 0; width: 100%; height: 100%; background: ${barGradient}; border-radius: 7px;"></div>
+              `}
+
+              <!-- Relleno de avance real -->
+              <div style="position: absolute; left: 0; top: 0; width: ${Math.min(100, Math.max(0, proj.realProgress ?? proj.overallProgress))}%; height: 100%; background: rgba(255, 255, 255, 0.2); border-radius: 7px 0 0 7px; pointer-events: none;"></div>
+
+              <!-- Etiquetas dentro de la barra -->
+              <div style="position: relative; z-index: 4; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 0.6rem; overflow: hidden; pointer-events: none;">
+                <span style="font-size: 0.7rem; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
+                  ${proj.realProgress ?? proj.overallProgress}% · ${proj.startDate} → ${proj.deliveryDate}
+                </span>
+                ${isPostponed ? `
+                  <span style="font-size: 0.62rem; font-weight: 700; color: #fef08a; background: rgba(0,0,0,0.5); padding: 0.05rem 0.35rem; border-radius: 4px; border: 1px solid rgba(254,240,138,0.3); margin-left: 0.3rem;">
+                    ⏳ +${proj.postponedDays}d
+                  </span>
+                ` : ''}
+              </div>
+
+              <!-- Diamante hito de entrega -->
+              <div class="exec-roadmap-milestone" title="Entrega: ${proj.deliveryDate}"></div>
+            </div>
+          </td>
+        `;
+      }
+      if (ci > startCol && ci < startCol + span) return '';
+      return `<td style="border-left: 1px solid rgba(255,255,255,0.04);"></td>`;
+    }).join('');
+
+    const initials = (proj.responsible || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+    return `
+      <tr style="height: 52px; border-bottom: 1px solid rgba(255,255,255,0.03);">
+        <td class="exec-roadmap-cell-sticky" onclick="window.highlightProjectInMatrix('${escapeHtml(proj.name)}')"
+            style="min-width: ${LABEL_W}px; max-width: ${LABEL_W}px; padding: 0.5rem 0.85rem; background: rgba(6, 19, 48, 0.96); border-left: 3px solid ${healthColor};"
+            title="Clic para localizar en la matriz">
+          <div style="display: flex; flex-direction: column; gap: 0.2rem; min-width: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;">
+              <strong style="font-size: 0.82rem; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${proj.name}
+              </strong>
+              <span class="exec-pill ${healthPillClass}" style="font-size: 0.6rem; padding: 0.05rem 0.35rem; flex-shrink: 0;">
+                ${proj.healthLabel}
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted);">
+              <span class="exec-pill exec-pill-purple" style="font-size: 0.6rem; padding: 0.05rem 0.35rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${proj.client}
+              </span>
+              <div style="display: flex; align-items: center; gap: 0.3rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; color: #e2e8f0;">
+                  ${initials}
+                </div>
+                <span style="font-size: 0.7rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${proj.responsible || 'Sin asignar'}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+        ${cells}
+      </tr>
+    `;
+  }).join('');
+
+  const legendItems = [
+    { key: 'on_track', label: 'A Tiempo', color: 'var(--exec-soft-green)', bg: 'var(--exec-soft-green-bg)', count: countOnTrack },
+    { key: 'at_risk', label: 'En Riesgo', color: 'var(--exec-soft-amber)', bg: 'var(--exec-soft-amber-bg)', count: countAtRisk },
+    { key: 'delayed', label: 'Retrasado', color: 'var(--exec-soft-coral)', bg: 'var(--exec-soft-coral-bg)', count: countDelayed },
+    { key: 'paused', label: 'Pausado', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', count: countPaused },
+    { key: 'completed', label: 'Completado', color: 'var(--exec-soft-blue)', bg: 'var(--exec-soft-blue-bg)', count: countCompleted }
+  ];
+
+  const legendHtml = `
+    <div style="display: flex; align-items: center; gap: 0.35rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 3px 6px; border-radius: 999px; flex-wrap: wrap;">
+      ${legendItems.map(item => {
+        const isSelected = activeFilters.has(item.key);
+        const isDimmed = isFilterActive && !isSelected;
+
+        let activeStyle = '';
+        if (isSelected) {
+          activeStyle = `background: ${item.bg}; border-color: ${item.color}; box-shadow: 0 0 12px ${item.color}55; color: #ffffff; font-weight: 700; transform: scale(1.03);`;
+        } else if (isDimmed) {
+          activeStyle = `opacity: 0.4; border-color: transparent;`;
+        } else {
+          activeStyle = `border-color: transparent;`;
+        }
+
+        return `
+          <button type="button"
+                  onclick="window.toggleExecutiveRoadmapHealthFilter('${item.key}')"
+                  class="roadmap-legend-btn"
+                  title="${isSelected ? `Activo: haz clic para desmarcar ${item.label}` : `Haz clic para incluir ${item.label} en el filtro`}"
+                  style="display: flex; align-items: center; gap: 0.35rem; background: transparent; border: 1px solid transparent; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; color: #cbd5e1; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); ${activeStyle}">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${item.color}; flex-shrink: 0; box-shadow: 0 0 6px ${item.color};"></span>
+            <span>${item.label}</span>
+            ${isSelected ? `<span style="font-size: 0.65rem; color: ${item.color}; font-weight: 900; margin-left: -0.1rem;">✓</span>` : ''}
+            <span style="font-size: 0.65rem; padding: 0.05rem 0.3rem; border-radius: 999px; background: rgba(255,255,255,0.08); color: ${item.color}; font-weight: 700;">${item.count}</span>
+          </button>
+        `;
+      }).join('')}
+
+      ${isFilterActive ? `
+        <button type="button"
+                onclick="window.clearExecutiveRoadmapHealthFilters()"
+                title="Limpiar filtros y mostrar todos"
+                style="display: flex; align-items: center; gap: 0.25rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.68rem; color: #38bdf8; font-weight: 600; cursor: pointer; margin-left: 0.2rem; transition: all 0.2s ease;">
+          <span>Todos ✕</span>
+        </button>
+      ` : ''}
+
+      <div style="display: flex; align-items: center; gap: 0.3rem; border-left: 1px solid rgba(255,255,255,0.12); padding-left: 0.5rem; margin-left: 0.2rem; font-size: 0.72rem;">
+        <span style="width: 8px; height: 8px; transform: rotate(45deg); background: #38bdf8; display: inline-block;"></span>
+        <span style="color: #38bdf8; font-weight: 600;">Hito Entrega</span>
       </div>
     </div>
   `;
+
+  const projectCountText = isFilterActive
+    ? `${filteredProjects.length} de ${projectsWithDates.length} proyectos`
+    : `${projectsWithDates.length} proyectos`;
+
+  container.innerHTML = `
+    <!-- Header del Roadmap con Controles y Leyenda -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 0.25rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.2rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.45rem;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="color: #38bdf8;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+            Roadmap Estratégico de Portafolio
+          </h3>
+          <span class="exec-pill exec-pill-purple" style="font-size: 0.68rem;">${projectCountText}</span>
+        </div>
+        <span style="font-size: 0.74rem; color: var(--text-muted);">
+          Línea de tiempo consolidada de proyectos · Selecciona uno o más estados en la leyenda para filtrar
+        </span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <!-- Selector de Modo de Escala y Centrado en Hoy -->
+        <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(0,0,0,0.35); padding: 3px; border-radius: 8px; border: 1px solid var(--card-border);">
+          <button class="toggle-btn ${mode === 'quarters' ? 'active' : ''}" style="height: 24px; padding: 0.15rem 0.65rem; font-size: 0.7rem;" onclick="window.setExecutiveRoadmapMode('quarters')">Trimestres</button>
+          <button class="toggle-btn ${mode === 'months' ? 'active' : ''}" style="height: 24px; padding: 0.15rem 0.65rem; font-size: 0.7rem;" onclick="window.setExecutiveRoadmapMode('months')">Meses</button>
+          <button class="toggle-btn ${mode === 'weeks' ? 'active' : ''}" style="height: 24px; padding: 0.15rem 0.65rem; font-size: 0.7rem;" onclick="window.setExecutiveRoadmapMode('weeks')">Semanas</button>
+          <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.12); margin: 0 0.2rem;"></div>
+          <button type="button" class="toggle-btn" style="height: 24px; padding: 0.15rem 0.65rem; font-size: 0.7rem; color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.1); cursor: pointer;" onclick="window.centerExecutiveRoadmapOnToday(true)" title="Centrar vista en el día de Hoy">📍 Hoy</button>
+        </div>
+
+        <!-- Leyenda Seleccionable -->
+        ${legendHtml}
+      </div>
+    </div>
+
+    <!-- Contenedor Scrollable del Roadmap -->
+    <div class="exec-roadmap-scroll">
+      <div style="position: relative; width: ${totalW}px; min-width: ${totalW}px;">
+        ${todayLineHtml}
+        <table class="exec-roadmap-table" style="width: ${totalW}px; min-width: ${totalW}px;">
+          <colgroup>
+            <col style="width: ${LABEL_W}px;">
+            ${timeline.map(() => `<col style="width: ${COL_W}px;">`).join('')}
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="exec-roadmap-header-sticky" style="min-width: ${LABEL_W}px; padding: 0.65rem 0.9rem; font-size: 0.75rem; font-weight: 700; color: #38bdf8; text-align: left; text-transform: uppercase; letter-spacing: 0.05em;">
+                Proyecto / Cliente
+              </th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="${totalCols + 1}" style="text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: 0.85rem;">No hay proyectos para los estados seleccionados. <button type="button" onclick="window.clearExecutiveRoadmapHealthFilters()" class="toggle-btn" style="display: inline-flex; margin-left: 0.5rem;">Ver todos</button></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Centrado automático de la línea roja de HOY en el visor del Roadmap
+  if (todayPos) {
+    const doCenter = (smooth = false) => {
+      const scrollEl = container.querySelector('.exec-roadmap-scroll');
+      if (!scrollEl) return;
+      const containerWidth = scrollEl.clientWidth;
+      const visibleTimelineWidth = containerWidth - LABEL_W;
+      const visibleCenter = LABEL_W + Math.max(0, visibleTimelineWidth / 2);
+      const targetScroll = Math.max(0, Math.round(todayPos.px - visibleCenter));
+      if (smooth) {
+        scrollEl.scrollTo({ left: targetScroll, behavior: 'smooth' });
+      } else {
+        scrollEl.scrollLeft = targetScroll;
+      }
+    };
+
+    doCenter(false);
+    requestAnimationFrame(() => doCenter(false));
+    setTimeout(() => doCenter(false), 50);
+  }
 }
+
+window.centerExecutiveRoadmapOnToday = function(smooth = true) {
+  const container = document.getElementById('execRoadmapContainer');
+  if (!container) return;
+  const scrollEl = container.querySelector('.exec-roadmap-scroll');
+  if (!scrollEl) return;
+  const todayLine = container.querySelector('.exec-roadmap-today-line');
+  if (!todayLine) return;
+
+  const todayLeftPx = parseFloat(todayLine.style.left) || todayLine.offsetLeft;
+  const LABEL_W = 270;
+  const containerWidth = scrollEl.clientWidth;
+  const visibleTimelineWidth = containerWidth - LABEL_W;
+  const visibleCenter = LABEL_W + Math.max(0, visibleTimelineWidth / 2);
+  const targetScroll = Math.max(0, Math.round(todayLeftPx - visibleCenter));
+
+  if (smooth) {
+    scrollEl.scrollTo({ left: targetScroll, behavior: 'smooth' });
+  } else {
+    scrollEl.scrollLeft = targetScroll;
+  }
+};
+
+if (!window._execRoadmapResizeAttached) {
+  window._execRoadmapResizeAttached = true;
+  window.addEventListener('resize', () => {
+    if (document.getElementById('execRoadmapContainer')) {
+      window.centerExecutiveRoadmapOnToday(false);
+    }
+  });
+}
+
+window.setExecutiveRoadmapMode = function(mode) {
+  appState.execRoadmapMode = mode;
+  const projects = getExecutiveProjects();
+  renderExecutiveRoadmap(projects);
+};
+
+window.toggleExecutiveRoadmapHealthFilter = function(filterKey) {
+  if (!(appState.execRoadmapHealthFilters instanceof Set)) {
+    appState.execRoadmapHealthFilters = new Set();
+  }
+  if (appState.execRoadmapHealthFilters.has(filterKey)) {
+    appState.execRoadmapHealthFilters.delete(filterKey);
+  } else {
+    appState.execRoadmapHealthFilters.add(filterKey);
+  }
+  const projects = getExecutiveProjects();
+  renderExecutiveRoadmap(projects);
+};
+
+window.clearExecutiveRoadmapHealthFilters = function() {
+  if (appState.execRoadmapHealthFilters instanceof Set) {
+    appState.execRoadmapHealthFilters.clear();
+  } else {
+    appState.execRoadmapHealthFilters = new Set();
+  }
+  const projects = getExecutiveProjects();
+  renderExecutiveRoadmap(projects);
+};
+
+window.setExecutiveRoadmapHealthFilter = function(filterKey) {
+  if (filterKey === 'all') {
+    window.clearExecutiveRoadmapHealthFilters();
+  } else {
+    window.toggleExecutiveRoadmapHealthFilter(filterKey);
+  }
+};
 
 function renderExecutiveScatterPlot(projects) {
   const container = document.getElementById('execScatterPlotContainer');
@@ -2508,6 +3499,7 @@ function renderExecutiveScatterPlot(projects) {
 
     let dotColor = 'var(--exec-soft-green)';
     if (dp.health === 'completed') dotColor = 'var(--exec-soft-blue)';
+    else if (dp.health === 'paused') dotColor = '#94a3b8';
     else if (dp.health === 'at_risk') dotColor = 'var(--exec-soft-amber)';
     else if (dp.health === 'delayed') dotColor = 'var(--exec-soft-coral)';
 
@@ -2522,9 +3514,39 @@ function renderExecutiveScatterPlot(projects) {
   }).join('');
 
   container.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; color: var(--text-main);">Cronograma de Cumplimiento (Entregas vs. Progreso)</h3>
-      <span style="font-size: 0.72rem; color: var(--text-muted);">Pasa el cursor sobre los puntos para ver detalles · Clic para buscar en la matriz</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; color: var(--text-main);">Cronograma de Cumplimiento (Entregas vs. Progreso)</h3>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Pasa el cursor sobre los puntos para ver detalles · Clic para buscar en la matriz</span>
+      </div>
+      
+      <!-- Leyenda de Colores -->
+      <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); padding: 0.4rem 0.8rem; border-radius: 999px; font-size: 0.74rem;">
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--exec-soft-green); display: inline-block; box-shadow: 0 0 6px var(--exec-soft-green);"></span>
+          <span style="color: #cbd5e1;">A Tiempo</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--exec-soft-amber); display: inline-block; box-shadow: 0 0 6px var(--exec-soft-amber);"></span>
+          <span style="color: #cbd5e1;">En Riesgo</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--exec-soft-coral); display: inline-block; box-shadow: 0 0 6px var(--exec-soft-coral);"></span>
+          <span style="color: #cbd5e1;">Retrasado</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+          <span style="color: #cbd5e1;">En Pausa</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--exec-soft-blue); display: inline-block; box-shadow: 0 0 6px var(--exec-soft-blue);"></span>
+          <span style="color: #cbd5e1;">Completado</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem; border-left: 1px solid rgba(255,255,255,0.12); padding-left: 0.6rem;">
+          <span style="width: 12px; height: 0; border-top: 2px dashed var(--exec-soft-coral); display: inline-block;"></span>
+          <span style="color: var(--exec-soft-coral); font-weight: 600;">Hoy</span>
+        </div>
+      </div>
     </div>
     <div style="position: relative; width: 100%; overflow-x: auto; background: rgba(3, 11, 30, 0.65); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2); padding: 1rem 0.5rem 0.5rem 0.5rem;">
       <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" style="min-width: 600px; display: block;">
@@ -2565,9 +3587,10 @@ function renderExecutiveKPIs(projects) {
   const onTrack = projects.filter(p => p.health === 'on_track').length;
   const atRisk = projects.filter(p => p.health === 'at_risk').length;
   const delayed = projects.filter(p => p.health === 'delayed').length;
-  const completed = projects.filter(p => p.health === 'completed').length;
+  const paused = projects.filter(p => p.health === 'paused' || p.isPaused || p.status === 'Pausado').length;
+  const completed = projects.filter(p => (p.health === 'completed' || p.status === 'Completado') && !p.isPaused).length;
 
-  const activeProjects = projects.filter(p => p.status !== 'Completado');
+  const activeProjects = projects.filter(p => p.status !== 'Completado' && p.health !== 'completed');
   const avgProgress = activeProjects.length > 0
     ? Math.round(activeProjects.reduce((sum, p) => sum + (p.overallProgress || 0), 0) / activeProjects.length)
     : (total > 0 ? 100 : 0);
@@ -2590,22 +3613,26 @@ function renderExecutiveKPIs(projects) {
         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Salud de Cartera</span>
         <span class="exec-pill exec-pill-purple">${total} proyectos</span>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.75rem;">
-        <div style="background: var(--exec-soft-green-bg); border: 1px solid var(--exec-soft-green-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-green);">${onTrack}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">A Tiempo</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.5rem; margin-top: 0.75rem;">
+        <div style="background: var(--exec-soft-green-bg); border: 1px solid var(--exec-soft-green-border); padding: 0.6rem 0.5rem; border-radius: 10px;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: var(--exec-soft-green);">${onTrack}</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">A Tiempo</div>
         </div>
-        <div style="background: var(--exec-soft-amber-bg); border: 1px solid var(--exec-soft-amber-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-amber);">${atRisk}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">En Riesgo</div>
+        <div style="background: var(--exec-soft-amber-bg); border: 1px solid var(--exec-soft-amber-border); padding: 0.6rem 0.5rem; border-radius: 10px;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: var(--exec-soft-amber);">${atRisk}</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">En Riesgo</div>
         </div>
-        <div style="background: var(--exec-soft-coral-bg); border: 1px solid var(--exec-soft-coral-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-coral);">${delayed}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">Retrasados</div>
+        <div style="background: var(--exec-soft-coral-bg); border: 1px solid var(--exec-soft-coral-border); padding: 0.6rem 0.5rem; border-radius: 10px;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: var(--exec-soft-coral);">${delayed}</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">Retrasados</div>
         </div>
-        <div style="background: var(--exec-soft-blue-bg); border: 1px solid var(--exec-soft-blue-border); padding: 0.6rem 0.75rem; border-radius: 10px;">
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--exec-soft-blue);">${completed}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">Completados</div>
+        <div style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.25); padding: 0.6rem 0.5rem; border-radius: 10px;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: #94a3b8;">${paused}</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">En Pausa</div>
+        </div>
+        <div style="background: var(--exec-soft-blue-bg); border: 1px solid var(--exec-soft-blue-border); padding: 0.6rem 0.5rem; border-radius: 10px;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: var(--exec-soft-blue);">${completed}</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">Completados</div>
         </div>
       </div>
     </div>
@@ -2806,6 +3833,7 @@ function renderExecutiveHealthFilters() {
     { key: 'on_track', label: 'A Tiempo' },
     { key: 'at_risk', label: 'En Riesgo' },
     { key: 'delayed', label: 'Retrasados' },
+    { key: 'paused', label: 'En Pausa' },
     { key: 'completed', label: 'Completados' }
   ];
 
@@ -2834,7 +3862,13 @@ function renderExecutiveProjectsTable(projects) {
 
   // Filter by health
   if (appState.execHealthFilter && appState.execHealthFilter !== 'all') {
-    filtered = filtered.filter(p => p.health === appState.execHealthFilter);
+    if (appState.execHealthFilter === 'paused') {
+      filtered = filtered.filter(p => p.health === 'paused' || p.isPaused || p.status === 'Pausado');
+    } else if (appState.execHealthFilter === 'completed') {
+      filtered = filtered.filter(p => (p.health === 'completed' || p.status === 'Completado') && !p.isPaused);
+    } else {
+      filtered = filtered.filter(p => p.health === appState.execHealthFilter);
+    }
   }
 
   // Filter by search query
@@ -2860,10 +3894,19 @@ function renderExecutiveProjectsTable(projects) {
 
   tbody.innerHTML = filtered.map(proj => {
     let healthPill = '';
-    if (proj.health === 'on_track') healthPill = '<span class="exec-pill exec-pill-green">A Tiempo</span>';
-    else if (proj.health === 'at_risk') healthPill = '<span class="exec-pill exec-pill-amber">En Riesgo</span>';
-    else if (proj.health === 'delayed') healthPill = '<span class="exec-pill exec-pill-coral">Retrasado</span>';
-    else healthPill = '<span class="exec-pill exec-pill-blue">Completado</span>';
+    if (proj.health === 'paused' || proj.isPaused || proj.status === 'Pausado') {
+      healthPill = '<span class="exec-pill" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">⏸️ En Pausa</span>';
+    } else if (proj.health === 'on_track') {
+      healthPill = '<span class="exec-pill exec-pill-green">A Tiempo</span>';
+    } else if (proj.health === 'at_risk') {
+      healthPill = '<span class="exec-pill exec-pill-amber">En Riesgo</span>';
+    } else if (proj.health === 'delayed') {
+      healthPill = '<span class="exec-pill exec-pill-coral">Retrasado</span>';
+    } else if (proj.health === 'completed' || proj.status === 'Completado') {
+      healthPill = '<span class="exec-pill exec-pill-blue">Completado</span>';
+    } else {
+      healthPill = '<span class="exec-pill exec-pill-green">A Tiempo</span>';
+    }
 
     return `
       <tr>

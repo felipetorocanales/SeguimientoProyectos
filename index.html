@@ -416,8 +416,18 @@
         </div>
       </div>
 
-      <!-- New Row: 5 Custom KPI Cards -->
-      <section id="execCustomKpisContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem;">
+      <!-- Row: 6 Custom KPI Cards -->
+      <section id="execCustomKpisContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem;">
+        <!-- Injected by JS -->
+      </section>
+
+      <!-- Row: Full-width PMO Recommendation Banner -->
+      <div id="execPmoRecommendationContainer">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Strategic Project Roadmap Section -->
+      <section id="execRoadmapContainer" class="exec-card" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
         <!-- Injected by JS -->
       </section>
 
@@ -547,10 +557,6 @@
       </section>
     </main>
   </div>
-
-  <!-- Flatpickr JS -->
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script type="module" src="/src/main.js?v=1.0.3"></script>
 
   <!-- New Project Modal -->
   <div id="newProjectModal" class="modal-overlay">
@@ -711,6 +717,62 @@
           <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
             <button type="button" id="cancelPostponeBtn" class="glass-card" style="padding: 0.5rem 1.2rem; font-size:0.85rem;">Cancelar</button>
             <button type="submit" class="primary" style="padding: 0.5rem 1.4rem; font-size:0.85rem; background:linear-gradient(135deg,#f59e0b,#d97706);">Confirmar Aplazamiento</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause Project Modal -->
+  <div id="pauseModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 460px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div
+            style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;">
+            <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-size:1.1rem; margin:0;">Pausar Proyecto</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Registro de pausa temporal y ajuste de cronograma</p>
+          </div>
+        </div>
+        <button id="closePauseModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="pauseForm">
+          <input type="hidden" id="pauseProjectId" />
+
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.78rem;">Proyecto</label>
+            <div id="pauseProjectName" style="font-weight:700; color:#f8fafc; font-size:0.95rem; margin-bottom:0.25rem;">—</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="pauseStartDate" style="font-size:0.8rem;">📅 Fecha de Inicio de la Pausa *</label>
+            <input type="text" id="pauseStartDate" class="form-input" placeholder="Seleccionar fecha de pausa..." required readonly style="cursor:pointer;" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="pauseReason" style="font-size:0.8rem;">Motivo de la Pausa *</label>
+            <textarea id="pauseReason" class="form-input" rows="3" required
+              placeholder="Ej: En espera de aprobación de accesos por parte del cliente, cambio de prioridades..."
+              style="resize:vertical; min-height:80px;"></textarea>
+          </div>
+
+          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.78rem; color:#fef08a; display:flex; gap:0.5rem; align-items:flex-start;">
+            <span style="font-size:1rem; line-height:1;">ℹ️</span>
+            <span>Los días que el proyecto permanezca en pausa se sumarán automáticamente a la fecha de entrega y quedarán reflejados sutilmente en la carta Gantt y en el historial.</span>
+          </div>
+
+          <p id="pauseError" style="display:none; color: #f87171; font-size: 0.8rem; margin: 0.5rem 0;"></p>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="button" id="cancelPauseBtn" class="glass-card" style="padding: 0.5rem 1.2rem; font-size:0.85rem;">Cancelar</button>
+            <button type="submit" class="primary" style="padding: 0.5rem 1.4rem; font-size:0.85rem; background:linear-gradient(135deg,#f59e0b,#d97706); font-weight:700;">Confirmar Pausa</button>
           </div>
         </form>
       </div>
@@ -923,6 +985,9 @@
     </div>
   </div>
 
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script type="module" src="/src/main.js?v=1.1.0"></script>
 </body>
 
 </html>

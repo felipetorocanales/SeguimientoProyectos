@@ -68,6 +68,11 @@ function sendTelegramMessage(botToken, chatId, htmlText, replyMarkup = null) {
       res.on("end", () => {
         if (res.statusCode !== 200) {
           console.error(`[Telegram API Error ${res.statusCode}]`, data);
+          // If message failed with replyMarkup (e.g. keyboard error), retry plain text fallback
+          if (replyMarkup) {
+            console.warn("[Telegram] Retrying without replyMarkup as fallback...");
+            sendTelegramMessage(botToken, chatId, htmlText, null).catch(console.error);
+          }
         }
         resolve(data);
       });
@@ -80,6 +85,107 @@ function sendTelegramMessage(botToken, chatId, htmlText, replyMarkup = null) {
     req.write(payload);
     req.end();
   });
+}
+
+/**
+ * Edit a message's text and optional inline keyboard
+ */
+function editTelegramMessage(botToken, chatId, messageId, htmlText, replyMarkup = null) {
+  return new Promise((resolve, reject) => {
+    let safeText = htmlText;
+    if (safeText.length > 4000) {
+      safeText = safeText.substring(0, 3950) + "\n\n<i>[Mensaje truncado por longitud...]</i>";
+    }
+
+    const payloadObj = {
+      chat_id: chatId,
+      message_id: messageId,
+      text: safeText,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    };
+
+    if (replyMarkup) {
+      payloadObj.reply_markup = replyMarkup;
+    }
+
+    const payload = JSON.stringify(payloadObj);
+
+    const options = {
+      hostname: "api.telegram.org",
+      path: `/bot${botToken}/editMessageText`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        if (res.statusCode !== 200) {
+          console.error(`[Telegram Edit API Error ${res.statusCode}]`, data);
+        }
+        resolve(data);
+      });
+    });
+
+    req.on("error", (err) => {
+      console.error("[Telegram Edit Request Error]", err);
+      resolve();
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+const PAGE_SIZE = 8;
+
+/**
+ * Builds a paginated inline keyboard for project selection.
+ * Keeps callback_data tiny (< 10 bytes) to strictly respect Telegram's 64-byte limit.
+ */
+function buildProjectKeyboard(projects, page = 0) {
+  const totalPages = Math.ceil(projects.length / PAGE_SIZE) || 1;
+  const currentPage = Math.max(0, Math.min(page, totalPages - 1));
+  const startIndex = currentPage * PAGE_SIZE;
+  const pageProjects = projects.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const keyboard = [];
+
+  pageProjects.forEach((p, idx) => {
+    const globalIndex = startIndex + idx;
+    let badge = "🟢";
+    if (p.health === "at_risk") badge = "⚠️";
+    else if (p.health === "delayed") badge = "🚨";
+    else if (p.health === "paused") badge = "⏸️";
+
+    keyboard.push([
+      {
+        text: `${badge} ${p.name} (${p.overallProgress || 0}%)`,
+        callback_data: `p_${globalIndex}`,
+      },
+    ]);
+  });
+
+  // Navigation row if multiple pages
+  if (totalPages > 1) {
+    const navRow = [];
+    if (currentPage > 0) {
+      navRow.push({ text: "◀️ Anterior", callback_data: `page_${currentPage - 1}` });
+    }
+    navRow.push({ text: `📄 ${currentPage + 1}/${totalPages}`, callback_data: "noop" });
+    if (currentPage < totalPages - 1) {
+      navRow.push({ text: "Siguiente ▶️", callback_data: `page_${currentPage + 1}` });
+    }
+    keyboard.push(navRow);
+  }
+
+  keyboard.push([{ text: "❌ Cancelar", callback_data: "cancel_wizard" }]);
+
+  return { inline_keyboard: keyboard };
 }
 
 /**
@@ -125,7 +231,7 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
     // Helper to fetch all aggregated projects from Firestore
     const getProjects = async () => {
       const snapshot = await db.collection(collectionName).get();
-      const phases = snapshot.docs.map((d) => d.data());
+      const phases = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       return groupPhasesIntoProjects(phases);
     };
 
@@ -156,11 +262,66 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
         return res.status(200).send("OK");
       }
 
-      // STEP 1 CLICK: PROJECT SELECTED (`proj:<projectId>`)
-      if (data.startsWith("proj:")) {
-        const projectId = data.replace("proj:", "");
+      // NOOP ACTION (e.g. Page indicator button click)
+      if (data === "noop") {
+        return res.status(200).send("OK");
+      }
+
+      // PAGINATION CLICK (`page_<pageNumber>`)
+      if (data.startsWith("page_")) {
+        const page = parseInt(data.replace("page_", ""), 10) || 0;
+        const session = await getSession(chatId);
         const projects = await getProjects();
-        const project = projects.find((p) => p.projectId === projectId);
+        let targetList = [];
+
+        if (session && Array.isArray(session.projectList) && session.projectList.length > 0) {
+          targetList = session.projectList.map(
+            (sp) => projects.find((p) => p.projectId === sp.projectId || p.name === sp.name) || sp
+          );
+        } else {
+          targetList = projects.filter((p) => p.health !== "completed");
+        }
+
+        const keyboard = buildProjectKeyboard(targetList, page);
+        await editTelegramMessage(
+          botToken,
+          chatId,
+          cb.message.message_id,
+          "📌 <b>¿Qué proyecto deseas actualizar?</b>\n<i>Selecciona uno de la lista:</i>",
+          keyboard
+        );
+        return res.status(200).send("OK");
+      }
+
+      // STEP 1 CLICK: PROJECT SELECTED (`p_<index>` or legacy `proj:<projectId>`)
+      if (data.startsWith("p_") || data.startsWith("proj:")) {
+        let projectId = null;
+        let projectName = null;
+
+        if (data.startsWith("p_")) {
+          const idx = parseInt(data.replace("p_", ""), 10);
+          const session = await getSession(chatId);
+          if (session && Array.isArray(session.projectList) && session.projectList[idx]) {
+            projectId = session.projectList[idx].projectId;
+            projectName = session.projectList[idx].name;
+          } else {
+            const projects = await getProjects();
+            const activeProjects = projects.filter((p) => p.health !== "completed");
+            if (activeProjects[idx]) {
+              projectId = activeProjects[idx].projectId;
+              projectName = activeProjects[idx].name;
+            }
+          }
+        } else {
+          projectId = data.replace("proj:", "");
+        }
+
+        const projects = await getProjects();
+        const project = projects.find(
+          (p) =>
+            (projectId && p.projectId === projectId) ||
+            (projectName && p.name.toLowerCase() === projectName.toLowerCase())
+        );
 
         if (!project) {
           await sendTelegramMessage(botToken, chatId, "❌ No se encontró el proyecto seleccionado.");
@@ -278,6 +439,8 @@ async function handleTelegramWebhook(req, res, db, collectionName, botToken) {
 `📊 <b>Resumen Ejecutivo - Nexus Tracker</b>
 
 🔹 <b>Total Proyectos:</b> ${summary.total}
+▶️ <b>En curso:</b> ${summary.inProgress}
+⏸️ <b>En pausa:</b> ${summary.paused}
 ✅ <b>Completados:</b> ${summary.completed}
 🟢 <b>A tiempo:</b> ${summary.onTrack}
 ⚠️ <b>En riesgo:</b> ${summary.atRisk}
@@ -378,34 +541,47 @@ ${project.comment ? escapeHtml(project.comment.split("\n").slice(-4).join("\n"))
       const activeProjects = projects.filter((p) => p.health !== "completed");
 
       if (activeProjects.length === 0) {
-        await sendTelegramMessage(botToken, chatId, "📭 No hay proyectos activos para actualizar.");
+        await sendTelegramMessage(botToken, chatId, "📭 No hay proyectos activos para actualizar en este momento.");
         return res.status(200).send("OK");
       }
 
-      const projectButtons = activeProjects.map((p) => {
-        let badge = "🟢";
-        if (p.health === "at_risk") badge = "⚠️";
-        else if (p.health === "delayed") badge = "🚨";
-        return [
-          {
-            text: `${badge} ${p.name} (${p.overallProgress}%)`,
-            callback_data: `proj:${p.projectId}`,
-          },
-        ];
-      });
-      projectButtons.push([{ text: "❌ Cancelar", callback_data: "cancel_wizard" }]);
+      // Optional keyword filtering (e.g. "/actualizar sap" or "/actualizar medallon")
+      const filterArg = text.replace("/actualizar", "").replace(/^actualizar/i, "").trim().toLowerCase();
+      let displayedProjects = activeProjects;
+
+      if (filterArg) {
+        displayedProjects = activeProjects.filter((p) =>
+          p.name.toLowerCase().includes(filterArg) ||
+          (p.client && p.client.toLowerCase().includes(filterArg))
+        );
+
+        if (displayedProjects.length === 0) {
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            `🔍 No se encontraron proyectos activos que coincidan con <i>"${escapeHtml(filterArg)}"</i>.\nEscribe <b>/actualizar</b> sin parámetros para ver la lista completa.`
+          );
+          return res.status(200).send("OK");
+        }
+      }
+
+      const keyboard = buildProjectKeyboard(displayedProjects, 0);
 
       await sessionRef(chatId).set({
         chatId: String(chatId),
         step: "SELECT_PROJECT",
+        projectList: displayedProjects.map((p) => ({
+          projectId: p.projectId,
+          name: p.name,
+        })),
         updatedAt: Date.now(),
       });
 
       await sendTelegramMessage(
         botToken,
         chatId,
-        "📌 <b>¿Qué proyecto deseas actualizar?</b>\n<i>Selecciona uno de la lista:</i>",
-        { inline_keyboard: projectButtons }
+        "📌 <b>¿Qué proyecto deseas actualizar?</b>\n<i>Selecciona uno de la lista a continuación:</i>",
+        keyboard
       );
       return res.status(200).send("OK");
     }
@@ -483,6 +659,7 @@ async function executeProjectUpdate(db, collectionName, session, blockersText, b
 
   const matchingDocs = allDocs.filter(
     (p) =>
+      p.id === projectId ||
       p.projectId === projectId ||
       (p.project || "").toLowerCase() === (projectName || "").toLowerCase() ||
       (p.name || "").toLowerCase() === (projectName || "").toLowerCase()

@@ -34,9 +34,10 @@ export function parseDate(str) {
 }
 
 /**
- * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%)
+ * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%),
+ * accounting for active pauses and historical pause intervals.
  */
-export function calculateTimeProgress(startDateStr, deliveryDateStr) {
+export function calculateTimeProgress(startDateStr, deliveryDateStr, pauseHistory = []) {
   const start = parseDate(startDateStr);
   const end = parseDate(deliveryDateStr);
   if (!start || !end || end <= start) return 0;
@@ -48,8 +49,83 @@ export function calculateTimeProgress(startDateStr, deliveryDateStr) {
   if (today >= end) return 100;
 
   const totalTime = end.getTime() - start.getTime();
-  const elapsedTime = today.getTime() - start.getTime();
-  return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+  if (totalTime <= 0) return 0;
+
+  // Process pauses in chronological order
+  const validPauses = (Array.isArray(pauseHistory) ? pauseHistory : [])
+    .map(p => {
+      const pStart = parseDate(p.startDate);
+      const pEnd = p.endDate ? parseDate(p.endDate) : null;
+      return { start: pStart, end: pEnd, isClosed: !!pEnd };
+    })
+    .filter(p => p.start !== null)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const activePause = validPauses.find(p => !p.isClosed);
+
+  if (activePause) {
+    // CURRENTLY IN ACTIVE PAUSE:
+    // Work halted when activePause started.
+    // Progress remains frozen at the accumulated active work up to activePause.start,
+    // evaluated against the extended deadline (end).
+    const pauseStart = activePause.start;
+    let activeWorkMs = 0;
+    let currentCursor = start.getTime();
+
+    for (const p of validPauses) {
+      if (p === activePause) break;
+      const pStartTime = Math.max(currentCursor, p.start.getTime());
+      const pEndTime = p.end ? p.end.getTime() : pStartTime;
+      if (pStartTime > currentCursor) {
+        activeWorkMs += (pStartTime - currentCursor);
+      }
+      currentCursor = Math.max(currentCursor, pEndTime);
+    }
+
+    if (pauseStart.getTime() > currentCursor) {
+      activeWorkMs += (pauseStart.getTime() - currentCursor);
+    }
+
+    return Math.min(100, Math.max(0, Math.round((activeWorkMs / totalTime) * 100)));
+  }
+
+  // NOT IN ACTIVE PAUSE:
+  if (validPauses.length === 0) {
+    const elapsedTime = today.getTime() - start.getTime();
+    return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+  }
+
+  // HAS FINISHED PAUSES:
+  // Calculate total active work performed up to the last pause resume date,
+  // then interpolate remaining progress from last resume date to delivery date.
+  const lastPause = validPauses[validPauses.length - 1];
+  const lastResumeTime = lastPause.end ? lastPause.end.getTime() : today.getTime();
+
+  let activeWorkBeforeLastResumeMs = 0;
+  let cursor = start.getTime();
+  for (const p of validPauses) {
+    const pStartTime = Math.max(cursor, p.start.getTime());
+    const pEndTime = p.end ? p.end.getTime() : pStartTime;
+    if (pStartTime > cursor) {
+      activeWorkBeforeLastResumeMs += (pStartTime - cursor);
+    }
+    cursor = Math.max(cursor, pEndTime);
+  }
+
+  const progressAtResume = (activeWorkBeforeLastResumeMs / totalTime) * 100;
+
+  if (today.getTime() <= lastResumeTime) {
+    return Math.min(100, Math.max(0, Math.round(progressAtResume)));
+  }
+
+  const remainingSpanMs = end.getTime() - lastResumeTime;
+  if (remainingSpanMs <= 0) return 100;
+
+  const elapsedSinceResumeMs = today.getTime() - lastResumeTime;
+  const fraction = Math.min(1, Math.max(0, elapsedSinceResumeMs / remainingSpanMs));
+  const currentProgress = progressAtResume + fraction * (100 - progressAtResume);
+
+  return Math.min(100, Math.max(0, Math.round(currentProgress)));
 }
 
 /**
@@ -130,15 +206,180 @@ export async function createNewProject(db, projectName, clientName = 'General', 
 }
 
 /**
+ * Puts a project into pause, recording the reason, pause start date, and adding an entry to comment history.
+ */
+export async function pauseProject(db, projectId, reason, user, customStartDate = '') {
+  if (!reason || !reason.trim()) return;
+
+  const today = new Date();
+  const d = String(today.getDate()).padStart(2, '0');
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const y = today.getFullYear();
+  const todayStr = `${d}/${m}/${y}`;
+  const pauseStartDate = customStartDate && customStartDate.trim() ? customStartDate.trim() : todayStr;
+
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [{ id: directSnap.id, ...directSnap.data() }];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id === projectId || p.projectId === projectId || (p.project === projectId && !p.projectId));
+  }
+
+  if (docsToUpdate.length === 0) return;
+
+  const logEntry = pauseStartDate === todayStr
+    ? `${todayStr}: ⏸️ Proyecto pausado. Motivo: ${reason.trim()}`
+    : `${todayStr}: ⏸️ Proyecto pausado (efectivo desde ${pauseStartDate}). Motivo: ${reason.trim()}`;
+
+  const promises = docsToUpdate.map(item => {
+    const docRef = doc(db, COLLECTION, item.id);
+    const existing = (item.comment || item.comments || '').trim();
+    const newComment = existing ? `${existing}\n${logEntry}` : logEntry;
+    
+    const pauseHistory = Array.isArray(item.pauseHistory) ? [...item.pauseHistory] : [];
+    pauseHistory.push({
+      startDate: pauseStartDate,
+      endDate: null,
+      reason: reason.trim()
+    });
+
+    return updateDoc(docRef, {
+      isPaused: true,
+      state: 'Pausado',
+      pausedAt: pauseStartDate,
+      pauseReason: reason.trim(),
+      pauseHistory,
+      comment: newComment,
+      lastModified: Date.now()
+    });
+  });
+
+  await Promise.all(promises);
+
+  if (docsToUpdate.length > 0) {
+    const projData = docsToUpdate[0];
+    await createAuditLog(db, user, 'PAUSE_PROJECT', {
+      id: projectId,
+      name: projData.project || projData.name,
+      client: projData.client,
+      reason: reason.trim()
+    });
+  }
+}
+
+/**
+ * Resumes a paused project, closing the open pause interval and updating the delivery date.
+ */
+export async function resumeProject(db, projectId, user) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = String(today.getDate()).padStart(2, '0');
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const y = today.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [{ id: directSnap.id, ...directSnap.data() }];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id === projectId || p.projectId === projectId || (p.project === projectId && !p.projectId));
+  }
+
+  if (docsToUpdate.length === 0) return;
+
+  const promises = docsToUpdate.map(item => {
+    const docRef = doc(db, COLLECTION, item.id);
+    const pauseHistory = Array.isArray(item.pauseHistory) ? [...item.pauseHistory] : [];
+    
+    let lastPauseDays = 0;
+    if (pauseHistory.length > 0 && pauseHistory[pauseHistory.length - 1].endDate === null) {
+      const lastPause = { ...pauseHistory[pauseHistory.length - 1] };
+      lastPause.endDate = dateStr;
+      const startPauseObj = parseDate(lastPause.startDate);
+      if (startPauseObj) {
+        const diff = Math.max(0, Math.round((today.getTime() - startPauseObj.getTime()) / (1000 * 60 * 60 * 24)));
+        lastPause.days = diff;
+        lastPauseDays = diff;
+      }
+      pauseHistory[pauseHistory.length - 1] = lastPause;
+    }
+
+    const logEntry = lastPauseDays > 0 
+      ? `${dateStr}: ▶️ Proyecto reanudado tras ${lastPauseDays} días de pausa.`
+      : `${dateStr}: ▶️ Proyecto reanudado.`;
+    const existing = (item.comment || item.comments || '').trim();
+    const newComment = existing ? `${existing}\n${logEntry}` : logEntry;
+
+    // Extend delivery date by lastPauseDays
+    let newDeliveryDate = item.deliveryDate || item.endDate || '';
+    if (lastPauseDays > 0 && newDeliveryDate) {
+      const delObj = parseDate(newDeliveryDate);
+      if (delObj) {
+        delObj.setDate(delObj.getDate() + lastPauseDays);
+        const newD = String(delObj.getDate()).padStart(2, '0');
+        const newM = String(delObj.getMonth() + 1).padStart(2, '0');
+        const newY = delObj.getFullYear();
+        newDeliveryDate = `${newD}/${newM}/${newY}`;
+      }
+    }
+
+    return updateDoc(docRef, {
+      isPaused: false,
+      state: 'En curso',
+      pausedAt: null,
+      pauseReason: null,
+      deliveryDate: newDeliveryDate,
+      endDate: newDeliveryDate,
+      pauseHistory,
+      comment: newComment,
+      lastModified: Date.now()
+    });
+  });
+
+  await Promise.all(promises);
+
+  if (docsToUpdate.length > 0) {
+    const projData = docsToUpdate[0];
+    await createAuditLog(db, user, 'RESUME_PROJECT', {
+      id: projectId,
+      name: projData.project || projData.name,
+      client: projData.client
+    });
+  }
+}
+
+/**
  * Postpones the project delivery date while permanently preserving the originalDeliveryDate.
  */
 export async function postponeProjectDelivery(db, projectId, newDeliveryDate, reason = '') {
   if (!newDeliveryDate) return;
-  const q = collection(db, COLLECTION);
-  const snapshot = await getDocs(q);
-  const docsToUpdate = snapshot.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [{ id: directSnap.id, ...directSnap.data() }];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id === projectId || p.projectId === projectId || (p.project === projectId && !p.projectId));
+  }
 
   if (docsToUpdate.length === 0) return;
 
@@ -190,11 +431,19 @@ export async function createAuditLog(db, user, action, projectDetails) {
  */
 export async function updateProjectMeta(db, projectId, newName, newResponsible, newClient, startDate, deliveryDate, state, inferredPhase, realProgress) {
   const finalNewName = (newName || '').replace(/\s+/g, ' ').trim();
-  const q = collection(db, COLLECTION);
-  const snapshot = await getDocs(q);
-  const docsToUpdate = snapshot.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [{ id: directSnap.id, ...directSnap.data() }];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id === projectId || p.projectId === projectId || (p.project === projectId && !p.projectId));
+  }
 
   const promises = docsToUpdate.map(item => {
     const docRef = doc(db, COLLECTION, item.id);
@@ -237,11 +486,19 @@ export async function addProjectComment(db, projectId, commentText) {
 
   const formattedEntry = `${dateStr}: ${commentText.trim()}`;
 
-  const q = collection(db, COLLECTION);
-  const snapshot = await getDocs(q);
-  const docsToUpdate = snapshot.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(p => p.projectId === projectId || (p.project === projectId && !p.projectId) || p.id === projectId);
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [{ id: directSnap.id, ...directSnap.data() }];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id === projectId || p.projectId === projectId || (p.project === projectId && !p.projectId));
+  }
 
   if (docsToUpdate.length === 0) return;
 
@@ -262,13 +519,21 @@ export async function addProjectComment(db, projectId, commentText) {
  * Soft-deletes a project by marking its documents as archived.
  */
 export async function archiveProject(db, projectId, user) {
-  const q = collection(db, COLLECTION);
-  const snapshot = await getDocs(q);
-  const docsToUpdate = snapshot.docs
-    .filter(d => {
-      const data = d.data();
-      return data.projectId === projectId || (data.project === projectId && !data.projectId) || d.id === projectId;
-    });
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [directSnap];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .filter(d => {
+        const data = d.data();
+        return d.id === projectId || data.id === projectId || data.projectId === projectId || (data.project === projectId && !data.projectId);
+      });
+  }
 
   if (docsToUpdate.length > 0) {
     const projData = docsToUpdate[0].data();
@@ -287,13 +552,21 @@ export async function archiveProject(db, projectId, user) {
  * Restores a soft-deleted project by removing the archived mark.
  */
 export async function restoreProject(db, projectId, user) {
-  const q = collection(db, COLLECTION);
-  const snapshot = await getDocs(q);
-  const docsToUpdate = snapshot.docs
-    .filter(d => {
-      const data = d.data();
-      return data.projectId === projectId || (data.project === projectId && !data.projectId) || d.id === projectId;
-    });
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
+  
+  let docsToUpdate = [];
+  if (directSnap.exists()) {
+    docsToUpdate = [directSnap];
+  } else {
+    const q = collection(db, COLLECTION);
+    const snapshot = await getDocs(q);
+    docsToUpdate = snapshot.docs
+      .filter(d => {
+        const data = d.data();
+        return d.id === projectId || data.id === projectId || data.projectId === projectId || (data.project === projectId && !data.projectId);
+      });
+  }
 
   if (docsToUpdate.length > 0) {
     const projData = docsToUpdate[0].data();
@@ -313,28 +586,37 @@ export async function restoreProject(db, projectId, user) {
  */
 export async function deleteProjectPermanently(db, projectId, user) {
   console.log("data.js: Iniciando eliminación física de:", projectId);
-  const colRef = collection(db, COLLECTION);
-  const q = query(colRef, where("projectId", "==", projectId));
-  let snapshot = await getDocs(q);
+  const directDocRef = doc(db, COLLECTION, projectId);
+  const directSnap = await getDoc(directDocRef);
 
-  if (snapshot.empty) {
-    const qLegacy = query(colRef, where("project", "==", projectId));
-    snapshot = await getDocs(qLegacy);
+  let docsToDelete = [];
+  if (directSnap.exists()) {
+    docsToDelete = [directSnap];
+  } else {
+    const colRef = collection(db, COLLECTION);
+    const q = query(colRef, where("projectId", "==", projectId));
+    let snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      const qLegacy = query(colRef, where("project", "==", projectId));
+      snapshot = await getDocs(qLegacy);
+    }
+    docsToDelete = snapshot.docs;
   }
 
-  if (snapshot.empty) {
+  if (docsToDelete.length === 0) {
     console.warn("data.js: No se encontraron documentos para el proyecto:", projectId);
     return;
   }
 
-  const projData = snapshot.docs[0].data();
+  const projData = docsToDelete[0].data();
   await createAuditLog(db, user, 'DELETE_PERMANENT', {
     id: projectId,
     name: projData.project || projData.name,
     client: projData.client
   });
 
-  const promises = snapshot.docs.map(d => deleteDoc(d.ref));
+  const promises = docsToDelete.map(d => deleteDoc(d.ref));
   await Promise.all(promises);
   console.log("data.js: Borrado completado.");
 }
@@ -352,12 +634,16 @@ export function aggregateProjectData(phases) {
   const itemsToProcess = singleCycleItems.length > 0 ? singleCycleItems : phases;
 
   itemsToProcess.forEach(item => {
-    const groupingKey = item.projectId || (item.project || item.name || '').replace(/\s+/g, ' ').trim();
+    const projName = (item.project || item.name || '').replace(/\s+/g, ' ').trim();
+    // Para proyectos de ciclo único, agrupamos por id de documento único o nombre para evitar que proyectos migrados con igual timestamp se fusionen
+    const groupingKey = (item.isSingleCycle === true || item.phase === 'Ciclo Principal')
+      ? (item.id || projName)
+      : (item.projectId || projName || item.id);
 
     if (!projects[groupingKey]) {
       projects[groupingKey] = {
-        id: groupingKey,
-        name: (item.project || item.name || '').replace(/\s+/g, ' ').trim(),
+        id: item.id || groupingKey,
+        name: projName,
         client: item.client || 'General',
         responsible: item.responsible || '',
         startDate: item.startDate || '',
@@ -403,6 +689,50 @@ export function aggregateProjectData(phases) {
       proj.deliveryDate = `${String(maxEnd.getDate()).padStart(2, '0')}/${String(maxEnd.getMonth() + 1).padStart(2, '0')}/${maxEnd.getFullYear()}`;
     }
 
+    // Pauses evaluation
+    const pauseHistories = proj.phases.flatMap(p => Array.isArray(p.pauseHistory) ? p.pauseHistory : []);
+    proj.pauseHistory = pauseHistories;
+    proj.isPaused = proj.phases.some(p => p.isPaused === true || p.state === 'Pausado');
+    
+    // Find active pause (endDate === null)
+    let activePauseDays = 0;
+    const activePause = proj.pauseHistory.find(ph => !ph.endDate);
+    if (activePause) {
+      proj.isPaused = true;
+      const startPauseDate = parseDate(activePause.startDate);
+      if (startPauseDate) {
+        activePauseDays = Math.max(0, Math.round((today.getTime() - startPauseDate.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+    }
+    proj.activePauseDays = activePauseDays;
+
+    // Total finished paused days
+    let finishedPausedDays = 0;
+    proj.pauseHistory.forEach(ph => {
+      if (ph.endDate) {
+        if (ph.days !== undefined) {
+          finishedPausedDays += Number(ph.days);
+        } else {
+          const sDate = parseDate(ph.startDate);
+          const eDate = parseDate(ph.endDate);
+          if (sDate && eDate) {
+            finishedPausedDays += Math.max(0, Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)));
+          }
+        }
+      }
+    });
+    proj.totalPausedDays = finishedPausedDays + activePauseDays;
+
+    // Dynamically extend deliveryDate by activePauseDays if currently in active pause
+    if (activePauseDays > 0 && proj.deliveryDate) {
+      const baseDelObj = parseDate(proj.deliveryDate);
+      if (baseDelObj) {
+        const dynamicDelObj = new Date(baseDelObj);
+        dynamicDelObj.setDate(dynamicDelObj.getDate() + activePauseDays);
+        proj.deliveryDate = `${String(dynamicDelObj.getDate()).padStart(2, '0')}/${String(dynamicDelObj.getMonth() + 1).padStart(2, '0')}/${dynamicDelObj.getFullYear()}`;
+      }
+    }
+
     // Determine immutable originalDeliveryDate
     const itemWithOrig = proj.phases.find(p => p.originalDeliveryDate);
     if (itemWithOrig && itemWithOrig.originalDeliveryDate) {
@@ -425,12 +755,14 @@ export function aggregateProjectData(phases) {
     const phaseOrder = ['Levantamiento', 'Desarrollo', 'Testing/QA', 'Entrega', 'Ciclo Principal'];
     proj.phases.sort((a, b) => phaseOrder.indexOf(a.phase) - phaseOrder.indexOf(b.phase));
 
-    const isCompleted = proj.state === 'Completado' || proj.state === 'Finalizado' ||
-      (proj.phases.length > 0 && proj.phases.every(p => p.state === 'Finalizado' || p.state === 'Completado'));
+    const isCompleted = !proj.isPaused && (proj.state === 'Completado' || proj.state === 'Finalizado' ||
+      (proj.phases.length > 0 && proj.phases.every(p => p.state === 'Finalizado' || p.state === 'Completado')));
 
     // Automatic time-based progress (Calendario consumido)
-    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
-    if (isCompleted) {
+    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate, proj.pauseHistory);
+    if (proj.isPaused) {
+      proj.status = 'Pausado';
+    } else if (isCompleted) {
       timeProgress = 100;
       proj.status = 'Completado';
     } else {
@@ -462,7 +794,10 @@ export function aggregateProjectData(phases) {
     }
 
     // Health calculation
-    if (isCompleted) {
+    if (proj.isPaused) {
+      proj.health = 'paused';
+      proj.healthLabel = 'En Pausa';
+    } else if (isCompleted) {
       proj.health = 'completed';
       proj.healthLabel = 'Completado';
     } else {

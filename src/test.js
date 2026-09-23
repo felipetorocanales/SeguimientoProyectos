@@ -15,14 +15,13 @@ function weekStart(date) {
   d.setHours(0, 0, 0, 0);
   return d;
 }
-  let allDates = [];
-  phases.forEach(p => {
-    const s = parseDate(p.startDate);
-    const e = parseDate(p.endDate);
-    if (s) allDates.push(s);
-    if (e) allDates.push(e);
-  });
-  const minDate = weekStart(new Date(Math.min(...allDates)));
-  const weeks = [];
-  weeks.push(minDate);
-  console.log("Min date:", minDate.toString());
+let allDates = [];
+phases.forEach(p => {
+  const s = parseDate(p.startDate);
+  const e = parseDate(p.endDate);
+  if (s) allDates.push(s);
+  if (e) allDates.push(e);
+});
+const minDate = weekStart(new Date(Math.min(...allDates)));
+const weeks = [];
+weeks.push(minDate);

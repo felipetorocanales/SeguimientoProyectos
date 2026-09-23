@@ -21,9 +21,10 @@ function parseDate(str) {
 }
 
 /**
- * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%)
+ * Calculates automatic progress based on elapsed time vs total timeframe (0 to 100%),
+ * accounting for active pauses and historical pause intervals.
  */
-function calculateTimeProgress(startDateStr, deliveryDateStr) {
+function calculateTimeProgress(startDateStr, deliveryDateStr, pauseHistory = []) {
   const start = parseDate(startDateStr);
   const end = parseDate(deliveryDateStr);
   if (!start || !end || end <= start) return 0;
@@ -35,8 +36,83 @@ function calculateTimeProgress(startDateStr, deliveryDateStr) {
   if (today >= end) return 100;
 
   const totalTime = end.getTime() - start.getTime();
-  const elapsedTime = today.getTime() - start.getTime();
-  return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+  if (totalTime <= 0) return 0;
+
+  // Process pauses in chronological order
+  const validPauses = (Array.isArray(pauseHistory) ? pauseHistory : [])
+    .map(p => {
+      const pStart = parseDate(p.startDate);
+      const pEnd = p.endDate ? parseDate(p.endDate) : null;
+      return { start: pStart, end: pEnd, isClosed: !!pEnd };
+    })
+    .filter(p => p.start !== null)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const activePause = validPauses.find(p => !p.isClosed);
+
+  if (activePause) {
+    // CURRENTLY IN ACTIVE PAUSE:
+    // Work halted when activePause started.
+    // Progress remains frozen at the accumulated active work up to activePause.start,
+    // evaluated against the extended deadline (end).
+    const pauseStart = activePause.start;
+    let activeWorkMs = 0;
+    let currentCursor = start.getTime();
+
+    for (const p of validPauses) {
+      if (p === activePause) break;
+      const pStartTime = Math.max(currentCursor, p.start.getTime());
+      const pEndTime = p.end ? p.end.getTime() : pStartTime;
+      if (pStartTime > currentCursor) {
+        activeWorkMs += (pStartTime - currentCursor);
+      }
+      currentCursor = Math.max(currentCursor, pEndTime);
+    }
+
+    if (pauseStart.getTime() > currentCursor) {
+      activeWorkMs += (pauseStart.getTime() - currentCursor);
+    }
+
+    return Math.min(100, Math.max(0, Math.round((activeWorkMs / totalTime) * 100)));
+  }
+
+  // NOT IN ACTIVE PAUSE:
+  if (validPauses.length === 0) {
+    const elapsedTime = today.getTime() - start.getTime();
+    return Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+  }
+
+  // HAS FINISHED PAUSES:
+  // Calculate total active work performed up to the last pause resume date,
+  // then interpolate remaining progress from last resume date to delivery date.
+  const lastPause = validPauses[validPauses.length - 1];
+  const lastResumeTime = lastPause.end ? lastPause.end.getTime() : today.getTime();
+
+  let activeWorkBeforeLastResumeMs = 0;
+  let cursor = start.getTime();
+  for (const p of validPauses) {
+    const pStartTime = Math.max(cursor, p.start.getTime());
+    const pEndTime = p.end ? p.end.getTime() : pStartTime;
+    if (pStartTime > cursor) {
+      activeWorkBeforeLastResumeMs += (pStartTime - cursor);
+    }
+    cursor = Math.max(cursor, pEndTime);
+  }
+
+  const progressAtResume = (activeWorkBeforeLastResumeMs / totalTime) * 100;
+
+  if (today.getTime() <= lastResumeTime) {
+    return Math.min(100, Math.max(0, Math.round(progressAtResume)));
+  }
+
+  const remainingSpanMs = end.getTime() - lastResumeTime;
+  if (remainingSpanMs <= 0) return 100;
+
+  const elapsedSinceResumeMs = today.getTime() - lastResumeTime;
+  const fraction = Math.min(1, Math.max(0, elapsedSinceResumeMs / remainingSpanMs));
+  const currentProgress = progressAtResume + fraction * (100 - progressAtResume);
+
+  return Math.min(100, Math.max(0, Math.round(currentProgress)));
 }
 
 /**
@@ -54,11 +130,15 @@ function groupPhasesIntoProjects(items) {
   for (const item of itemsToProcess) {
     if (item.isArchived) continue;
 
-    const key = item.projectId || item.project || item.id;
+    const projName = (item.project || item.name || "").replace(/\s+/g, " ").trim();
+    const key = (item.isSingleCycle === true || item.phase === "Ciclo Principal")
+      ? (item.id || projName)
+      : (item.projectId || projName || item.id);
+
     if (!projectMap.has(key)) {
       projectMap.set(key, {
-        projectId: item.projectId || key,
-        name: (item.project || item.name || "").replace(/\s+/g, " ").trim(),
+        projectId: item.id || key,
+        name: projName,
         client: item.client || "General",
         responsible: item.responsible || "",
         startDate: item.startDate || "",
@@ -96,11 +176,53 @@ function groupPhasesIntoProjects(items) {
       proj.deliveryDate = `${String(maxEnd.getDate()).padStart(2, '0')}/${String(maxEnd.getMonth() + 1).padStart(2, '0')}/${maxEnd.getFullYear()}`;
     }
 
-    const isCompleted = proj.state === "Completado" || proj.state === "Finalizado" || 
-      (proj.phases.length > 0 && proj.phases.every(p => p.state === "Completado" || p.state === "Finalizado"));
+    // Pauses evaluation
+    const pauseHistories = proj.phases.flatMap(p => Array.isArray(p.pauseHistory) ? p.pauseHistory : []);
+    proj.pauseHistory = pauseHistories;
+    proj.isPaused = proj.phases.some(p => p.isPaused === true || p.state === 'Pausado');
+    
+    // Find active pause
+    let activePauseDays = 0;
+    const activePause = proj.pauseHistory.find(ph => !ph.endDate);
+    if (activePause) {
+      proj.isPaused = true;
+      const startPauseDate = parseDate(activePause.startDate);
+      if (startPauseDate) {
+        activePauseDays = Math.max(0, Math.round((today.getTime() - startPauseDate.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+    }
+    proj.activePauseDays = activePauseDays;
+
+    let finishedPausedDays = 0;
+    proj.pauseHistory.forEach(ph => {
+      if (ph.endDate) {
+        if (ph.days !== undefined) {
+          finishedPausedDays += Number(ph.days);
+        } else {
+          const sDate = parseDate(ph.startDate);
+          const eDate = parseDate(ph.endDate);
+          if (sDate && eDate) {
+            finishedPausedDays += Math.max(0, Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)));
+          }
+        }
+      }
+    });
+    proj.totalPausedDays = finishedPausedDays + activePauseDays;
+
+    if (activePauseDays > 0 && proj.deliveryDate) {
+      const baseDelObj = parseDate(proj.deliveryDate);
+      if (baseDelObj) {
+        const dynamicDelObj = new Date(baseDelObj);
+        dynamicDelObj.setDate(dynamicDelObj.getDate() + activePauseDays);
+        proj.deliveryDate = `${String(dynamicDelObj.getDate()).padStart(2, '0')}/${String(dynamicDelObj.getMonth() + 1).padStart(2, '0')}/${dynamicDelObj.getFullYear()}`;
+      }
+    }
+
+    const isCompleted = !proj.isPaused && (proj.state === "Completado" || proj.state === "Finalizado" || 
+      (proj.phases.length > 0 && proj.phases.every(p => p.state === "Completado" || p.state === "Finalizado")));
 
     // Calculate automatic time-based progress
-    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate);
+    let timeProgress = calculateTimeProgress(proj.startDate, proj.deliveryDate, proj.pauseHistory);
     if (isCompleted) {
       timeProgress = 100;
     }
@@ -124,11 +246,14 @@ function groupPhasesIntoProjects(items) {
     // Health & Status determination
     let health = "on_track";
     let healthLabel = "A tiempo";
-    let status = isCompleted ? "Completado" : "En curso";
+    let status = proj.isPaused ? "Pausado" : (isCompleted ? "Completado" : "En curso");
 
     const deliveryEnd = parseDate(proj.deliveryDate);
 
-    if (isCompleted) {
+    if (proj.isPaused) {
+      health = "paused";
+      healthLabel = "En Pausa";
+    } else if (isCompleted) {
       health = "completed";
       healthLabel = "Completado";
     } else if (deliveryEnd && today > deliveryEnd) {
@@ -225,15 +350,17 @@ function findProjectByName(projects, searchName) {
 function computeSummary(projects) {
   const total = projects.length;
   const completed = projects.filter((p) => p.health === "completed").length;
+  const paused = projects.filter((p) => p.health === "paused" || p.isPaused).length;
   const delayed = projects.filter((p) => p.health === "delayed").length;
   const atRisk = projects.filter((p) => p.health === "at_risk").length;
   const onTrack = projects.filter((p) => p.health === "on_track").length;
+  const inProgress = total - completed - paused;
   const sla = total > 0 ? Math.round(((total - delayed) / total) * 100) : 100;
   const criticalProjects = projects
     .filter((p) => p.health === "delayed" || p.health === "at_risk")
     .map((p) => p.name);
 
-  return { total, completed, onTrack, atRisk, delayed, sla, criticalProjects };
+  return { total, inProgress, paused, completed, onTrack, atRisk, delayed, sla, criticalProjects };
 }
 
 module.exports = {
