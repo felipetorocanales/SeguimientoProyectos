@@ -31,7 +31,12 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  generateAIContent,
+  getOllamaConfig,
+  saveOllamaConfig,
+  testOllamaConnection
+} from './aiService.js';
 
 // Application State
 let appState = {
@@ -427,10 +432,45 @@ function setupAuthListeners() {
 
   document.getElementById('settingsForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const key = document.getElementById('geminiApiKey').value.trim();
-    localStorage.setItem('gemini_api_key', key);
-    alert('Configuración guardada correctamente.');
+    const url = document.getElementById('ollamaUrl')?.value.trim();
+    const model = document.getElementById('ollamaModel')?.value.trim();
+    saveOllamaConfig(url, model);
+    alert('Configuración de Ollama guardada correctamente.');
     closeSettingsModal();
+  });
+
+  document.getElementById('testOllamaBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('testOllamaBtn');
+    const statusDiv = document.getElementById('ollamaTestStatus');
+    const url = document.getElementById('ollamaUrl')?.value.trim();
+    const model = document.getElementById('ollamaModel')?.value.trim();
+
+    if (!btn || !statusDiv) return;
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ Probando...</span>`;
+    statusDiv.style.display = 'block';
+    statusDiv.style.background = 'rgba(59, 130, 246, 0.15)';
+    statusDiv.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+    statusDiv.style.color = '#93c5fd';
+    statusDiv.textContent = 'Conectando con el servidor Ollama...';
+
+    const result = await testOllamaConnection(url, model);
+
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+
+    if (result.success) {
+      statusDiv.style.background = 'rgba(16, 185, 129, 0.15)';
+      statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+      statusDiv.style.color = '#6ee7b7';
+      statusDiv.textContent = result.message;
+    } else {
+      statusDiv.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      statusDiv.style.color = '#fca5a5';
+      statusDiv.textContent = result.message;
+    }
   });
 
   document.getElementById('changePasswordForm')?.addEventListener('submit', handlePasswordChange);
@@ -438,10 +478,16 @@ function setupAuthListeners() {
 
 function openSettingsModal() {
   const modal = document.getElementById('settingsModal');
-  const apiKeyInput = document.getElementById('geminiApiKey');
+  const urlInput = document.getElementById('ollamaUrl');
+  const modelInput = document.getElementById('ollamaModel');
   const pwdForm = document.getElementById('changePasswordForm');
-  
-  if (apiKeyInput) apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+  const testStatus = document.getElementById('ollamaTestStatus');
+  if (testStatus) testStatus.style.display = 'none';
+
+  const { url, model } = getOllamaConfig();
+  if (urlInput) urlInput.value = url;
+  if (modelInput) modelInput.value = model;
+
   if (pwdForm) pwdForm.reset();
   
   const err = document.getElementById('passwordError');
@@ -1514,7 +1560,7 @@ function renderProjectCard(proj, index, isArchived) {
               <button class="ai-estimate-btn" 
                       id="ai-estimate-btn-${safeId}"
                       onclick="window.handleAIEstimateProgress('${proj.id}', this)"
-                      title="Analizar comentarios e historial con Gemini para estimar el % de avance real automáticamente">
+                      title="Analizar comentarios e historial con IA (Ollama) para estimar el % de avance real automáticamente">
                 <span class="ai-sparkle">✨</span> Estimar con IA
               </button>
             ` : `
@@ -1825,9 +1871,9 @@ function showAIFeedbackToast(projectName, progress, phase, justification) {
 }
 
 window.handleAIEstimateProgress = async function(projectId, btnEl) {
-  const apiKey = localStorage.getItem('geminiApiKey') || localStorage.getItem('gemini_api_key');
-  if (!apiKey) {
-    alert("Para usar la estimación inteligente con Gemini AI, debes configurar tu API Key en Ajustes.");
+  const { url, model } = getOllamaConfig();
+  if (!url) {
+    alert("Para usar la estimación inteligente con IA, debes configurar la URL de Ollama en Ajustes.");
     openSettingsModal();
     return;
   }
@@ -1877,10 +1923,8 @@ Responde ÚNICAMENTE un objeto JSON válido (sin etiquetas markdown ni texto fue
 }
 `;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
+    const responseText = await generateAIContent(prompt, { format: 'json' });
+    let text = responseText.trim();
 
     if (text.startsWith('```json')) {
       text = text.replace(/^```json/, '').replace(/```$/, '').trim();
@@ -1918,14 +1962,14 @@ Responde ÚNICAMENTE un objeto JSON válido (sin etiquetas markdown ni texto fue
       db,
       appState.currentUser,
       'IA_ESTIMATE_PROGRESS',
-      `IA estimó avance real de "${proj.name}" de ${oldProgress}% a ${newProgress}% (${data.justification || ''})`
+      `IA (${model}) estimó avance real de "${proj.name}" de ${oldProgress}% a ${newProgress}% (${data.justification || ''})`
     );
 
     showAIFeedbackToast(proj.name, newProgress, newPhase, data.justification);
     render();
   } catch (error) {
     console.error("Error al estimar avance con IA:", error);
-    alert("Hubo un error al consultar a Gemini AI: " + (error.message || "Verifica tu API Key o conexión"));
+    alert("Hubo un error al consultar a la IA (Ollama): " + (error.message || "Verifica la conexión con el MacBook"));
     btnEl.disabled = false;
     btnEl.innerHTML = originalHtml;
   }
@@ -2458,35 +2502,10 @@ function setupEventListeners() {
     });
   }
 
-  // Settings Modal logic
+  // Settings Modal logic - managed centrally by openSettingsModal / closeSettingsModal
   const settingsBtn = document.getElementById('settingsBtn');
-  const settingsModal = document.getElementById('settingsModal');
-  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-  const settingsForm = document.getElementById('settingsForm');
-  const geminiApiKeyInput = document.getElementById('geminiApiKey');
-  
   settingsBtn?.addEventListener('click', () => {
-    if (geminiApiKeyInput) {
-      geminiApiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
-    }
-    settingsModal?.classList.add('active');
-  });
-  
-  const closeSettings = () => {
-    settingsModal?.classList.remove('active');
-  };
-  
-  closeSettingsBtn?.addEventListener('click', closeSettings);
-  settingsModal?.addEventListener('click', (e) => {
-    if (e.target === settingsModal) closeSettings();
-  });
-  
-  settingsForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (geminiApiKeyInput) {
-      localStorage.setItem('geminiApiKey', geminiApiKeyInput.value.trim());
-    }
-    closeSettings();
+    openSettingsModal();
   });
 }
 
@@ -3959,26 +3978,27 @@ function renderExecutiveProjectsTable(projects) {
   }).join('');
 }
 
-// ─── Gemini AI Executive Briefing ──────────────────────────────────────────
+// ─── Ollama AI Executive Briefing ──────────────────────────────────────────
 window.generateExecutiveBriefing = async function() {
   const modal = document.getElementById('executiveAiModal');
   const contentEl = document.getElementById('executiveAiModalContent');
   if (!modal || !contentEl) return;
 
+  const { url, model } = getOllamaConfig();
+
   modal.classList.add('active');
   contentEl.innerHTML = `
     <div style="display: flex; flex-direction: column; align-items: center; padding: 3rem 1rem; gap: 1rem; color: var(--text-muted);">
       <div class="spinner"></div>
-      <p style="font-size: 0.95rem; color: #c7d2fe;">Analizando cartera con Gemini AI y redactando minuta ejecutiva...</p>
+      <p style="font-size: 0.95rem; color: #c7d2fe;">Analizando cartera con Ollama (${model}) y redactando minuta ejecutiva...</p>
     </div>
   `;
 
-  const apiKey = localStorage.getItem('geminiApiKey') || localStorage.getItem('gemini_api_key');
-  if (!apiKey) {
+  if (!url) {
     contentEl.innerHTML = `
       <div style="padding: 1.5rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; color: #fca5a5;">
-        <h4 style="margin: 0 0 0.5rem; color: #f87171;">API Key requerida</h4>
-        <p style="margin: 0 0 1rem; font-size: 0.85rem;">Para generar la minuta ejecutiva con inteligencia artificial, debes configurar tu API Key de Gemini en Ajustes.</p>
+        <h4 style="margin: 0 0 0.5rem; color: #f87171;">Servidor Ollama requerido</h4>
+        <p style="margin: 0 0 1rem; font-size: 0.85rem;">Para generar la minuta ejecutiva con inteligencia artificial, debes configurar la URL de Ollama en Ajustes.</p>
         <button onclick="document.getElementById('executiveAiModal').classList.remove('active'); openSettingsModal();" class="primary" style="font-size: 0.8rem; padding: 0.4rem 1rem;">
           Ir a Configuración
         </button>
@@ -4035,10 +4055,7 @@ Utiliza un tono ejecutivo, analítico, sobrio y directo. Usa formato Markdown li
 `;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await generateAIContent(prompt);
     appState.lastAiBriefingText = text;
 
     let html = text
@@ -4051,7 +4068,7 @@ Utiliza un tono ejecutivo, analítico, sobrio y directo. Usa formato Markdown li
     contentEl.innerHTML = `
       <div style="margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
         <span class="exec-pill exec-pill-purple">Cartera: ${appState.execSelectedClient === 'all' ? 'Portafolio Global' : appState.execSelectedClient}</span>
-        <span style="font-size:0.75rem; color:var(--text-muted);">Generado con Gemini 2.5 Flash</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Generado con Ollama (${model})</span>
       </div>
       <div>${html}</div>
     `;
@@ -4302,13 +4319,13 @@ window.handleGanttHover = function(e, projectId) {
       return;
     }
     
-    const apiKey = localStorage.getItem('geminiApiKey');
-    if (!apiKey) {
-      tooltipContent.innerHTML = `No se ha configurado una API Key de Gemini. <a href="#" onclick="document.getElementById('settingsModal').classList.add('active'); return false;" style="color:var(--accent-primary);">Configurar aquí</a>.`;
+    const { url, model } = getOllamaConfig();
+    if (!url) {
+      tooltipContent.innerHTML = `No se ha configurado la URL de Ollama. <a href="#" onclick="document.getElementById('settingsModal').classList.add('active'); return false;" style="color:var(--accent-primary);">Configurar aquí</a>.`;
       return;
     }
     
-    tooltipContent.innerHTML = `Analizando <b>${proj.phases.length}</b> fases del proyecto... <div class="spinner" style="margin-top:0.5rem;width:16px;height:16px;"></div>`;
+    tooltipContent.innerHTML = `Analizando <b>${proj.phases.length}</b> fases del proyecto con Ollama... <div class="spinner" style="margin-top:0.5rem;width:16px;height:16px;"></div>`;
     
     // Build context for AI
     const comments = proj.phases.filter(p => p.comment && p.comment.trim() !== '').map(p => `${p.phase}: ${p.comment}`);
@@ -4322,17 +4339,14 @@ window.handleGanttHover = function(e, projectId) {
     const prompt = `Eres un asistente de Project Management. A continuación te doy datos del proyecto: ${promptContext}. Escribe un resumen ejecutivo y conciso (máximo 40 palabras) de la salud del proyecto. Si hay comentarios, destaca riesgos o puntos importantes en viñetas cortas. Mantén un tono profesional y utiliza formato markdown simple.`;
     
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const text = await generateAIContent(prompt);
       // Format markdown to HTML briefly (replace ** with <b>, \n with <br>)
       const htmlText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
       aiCache.set(proj.name, htmlText);
       tooltipContent.innerHTML = htmlText;
     } catch (error) {
       console.error(error);
-      tooltipContent.innerHTML = `<span style="color:#f87171;">Error al generar el resumen. Verifica tu API Key o la conexión.</span>`;
+      tooltipContent.innerHTML = `<span style="color:#f87171;">Error al generar el resumen: ${error.message || 'Verifica la conexión con Ollama'}</span>`;
     }
   }, 600);
 };
