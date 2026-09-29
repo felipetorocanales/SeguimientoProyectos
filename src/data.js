@@ -910,3 +910,38 @@ export async function deleteUserProfile(db, uid) {
   const userRef = doc(db, USERS_COLLECTION, uid);
   await deleteDoc(userRef);
 }
+
+const SYSTEM_METADATA_COLLECTION = "system_metadata";
+
+/**
+ * Gets the last date the daily AI estimation was executed
+ */
+export async function getDailyAIEstimationMeta(db) {
+  try {
+    const docRef = doc(db, SYSTEM_METADATA_COLLECTION, "daily_ai_estimation");
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (err) {
+    console.warn("Could not read daily_ai_estimation meta from Firestore:", err);
+  }
+  return null;
+}
+
+/**
+ * Updates the last date the daily AI estimation was executed
+ */
+export async function setDailyAIEstimationMeta(db, dateStr, count = 0) {
+  try {
+    const docRef = doc(db, SYSTEM_METADATA_COLLECTION, "daily_ai_estimation");
+    await setDoc(docRef, {
+      lastRunDate: dateStr,
+      lastRunAt: new Date().toISOString(),
+      projectsEstimated: count
+    }, { merge: true });
+  } catch (err) {
+    console.warn("Could not save daily_ai_estimation meta to Firestore:", err);
+  }
+}
+

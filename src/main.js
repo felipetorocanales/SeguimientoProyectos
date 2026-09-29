@@ -21,7 +21,9 @@ import {
   deleteUserProfile,
   pauseProject,
   resumeProject,
-  createAuditLog
+  createAuditLog,
+  getDailyAIEstimationMeta,
+  setDailyAIEstimationMeta
 } from './data.js';
 import {
   onAuthStateChanged,
@@ -191,6 +193,8 @@ async function init() {
         appState.rawPhases = phases;
         appState.projects = aggregateProjectData(phases);
         render();
+        // Disparar chequeo de estimación diaria automática con IA
+        checkAndRunDailyAIEstimation();
       });
 
       // Subscribe to real-time updates: CLIENTS
@@ -473,7 +477,36 @@ function setupAuthListeners() {
     }
   });
 
+  document.getElementById('forceDailyAiBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('forceDailyAiBtn');
+    if (!btn) return;
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ Ejecutando estimación...</span>`;
+    await checkAndRunDailyAIEstimation(true);
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    updateDailyAiBadge();
+  });
+
   document.getElementById('changePasswordForm')?.addEventListener('submit', handlePasswordChange);
+}
+
+function updateDailyAiBadge() {
+  const badge = document.getElementById('dailyAiLastRunBadge');
+  if (!badge) return;
+  const lastDate = localStorage.getItem('nexus_last_daily_ai_date');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (lastDate === todayStr) {
+    badge.textContent = `✅ Al día (${lastDate})`;
+    badge.style.color = '#34d399';
+  } else if (lastDate) {
+    badge.textContent = `Última: ${lastDate}`;
+    badge.style.color = '#94a3b8';
+  } else {
+    badge.textContent = 'Pendiente hoy';
+    badge.style.color = '#fbbf24';
+  }
 }
 
 function openSettingsModal() {
@@ -487,6 +520,8 @@ function openSettingsModal() {
   const { url, model } = getOllamaConfig();
   if (urlInput) urlInput.value = url;
   if (modelInput) modelInput.value = model;
+
+  updateDailyAiBadge();
 
   if (pwdForm) pwdForm.reset();
   
@@ -1557,12 +1592,6 @@ function renderProjectCard(proj, index, isArchived) {
                 ${proj.realProgress}%
               </span>
               <span style="font-size: 0.68rem; color: #64748b;">(clic para editar)</span>
-              <button class="ai-estimate-btn" 
-                      id="ai-estimate-btn-${safeId}"
-                      onclick="window.handleAIEstimateProgress('${proj.id}', this)"
-                      title="Analizar comentarios e historial con IA (Ollama) para estimar el % de avance real automáticamente">
-                <span class="ai-sparkle">✨</span> Estimar con IA
-              </button>
             ` : `
               <span class="real-progress-badge">${proj.realProgress}%</span>
             `}
@@ -1870,25 +1899,61 @@ function showAIFeedbackToast(projectName, progress, phase, justification) {
   }, 6000);
 }
 
-window.handleAIEstimateProgress = async function(projectId, btnEl) {
+let isDailyAiRunning = false;
+
+function showDailyAIProgressToast(message, isDone = false) {
+  let toast = document.getElementById('dailyAiProgressToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'dailyAiProgressToast';
+    toast.style.position = 'fixed';
+    toast.style.bottom = '1.5rem';
+    toast.style.right = '1.5rem';
+    toast.style.zIndex = '99999';
+    toast.style.padding = '0.75rem 1.25rem';
+    toast.style.borderRadius = '12px';
+    toast.style.background = 'rgba(15, 23, 42, 0.95)';
+    toast.style.border = '1px solid rgba(56, 189, 248, 0.35)';
+    toast.style.backdropFilter = 'blur(10px)';
+    toast.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
+    toast.style.color = '#f8fafc';
+    toast.style.fontSize = '0.85rem';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '0.65rem';
+    toast.style.transition = 'all 0.3s ease';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `
+    <span class="ai-sparkle" style="font-size: 1.1rem;">✨</span>
+    <span>${message}</span>
+  `;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+
+  if (isDone) {
+    setTimeout(() => {
+      if (toast && toast.parentElement) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 400);
+      }
+    }, 5000);
+  }
+}
+
+/**
+ * Estima el avance real y la etapa de un proyecto individual con Ollama
+ */
+async function estimateProjectWithAI(proj) {
   const { url, model } = getOllamaConfig();
   if (!url) {
-    alert("Para usar la estimación inteligente con IA, debes configurar la URL de Ollama en Ajustes.");
-    openSettingsModal();
-    return;
+    throw new Error("No hay URL de Ollama configurada.");
   }
 
-  const proj = appState.projects.find(p => p.id === projectId);
-  if (!proj) return;
+  const rawComments = (proj.phases.map(p => p.comment).filter(Boolean).join('\n') || proj.comment || proj.comments || '').trim();
 
-  const originalHtml = btnEl.innerHTML;
-  btnEl.disabled = true;
-  btnEl.innerHTML = `<span class="ai-spinner"></span> Estimando...`;
-
-  try {
-    const rawComments = (proj.phases.map(p => p.comment).filter(Boolean).join('\n') || proj.comment || proj.comments || '').trim();
-
-    const prompt = `
+  const prompt = `
 Eres un Director de Proyectos y auditor técnico de avance de proyectos en una PMO tecnológica.
 Tu tarea es estimar con precisión y rigor profesional el **porcentaje de avance real** (un número entero de 0 a 100) del siguiente proyecto, evaluando sus entregables, bloqueos y comentarios.
 
@@ -1923,57 +1988,143 @@ Responde ÚNICAMENTE un objeto JSON válido (sin etiquetas markdown ni texto fue
 }
 `;
 
-    const responseText = await generateAIContent(prompt, { format: 'json' });
-    let text = responseText.trim();
+  const responseText = await generateAIContent(prompt, { format: 'json' });
+  let text = responseText.trim();
 
-    if (text.startsWith('```json')) {
-      text = text.replace(/^```json/, '').replace(/```$/, '').trim();
-    } else if (text.startsWith('```')) {
-      text = text.replace(/^```/, '').replace(/```$/, '').trim();
-    }
-
-    const data = JSON.parse(text);
-    const newProgress = Math.min(100, Math.max(0, Math.round(Number(data.estimatedProgress))));
-    const newPhase = data.inferredPhase || proj.inferredPhase || 'En curso';
-    const oldProgress = proj.realProgress;
-
-    // Optimistic update
-    proj.realProgress = newProgress;
-    proj.overallProgress = newProgress;
-    proj.inferredPhase = newPhase;
-    proj.currentPhase = newPhase;
-    proj.progressGap = proj.timeProgress - newProgress;
-
-    // Persist to Firestore
-    await updateProjectMeta(
-      db,
-      projectId,
-      proj.name,
-      proj.responsible,
-      proj.client,
-      proj.startDate,
-      proj.deliveryDate,
-      proj.state,
-      newPhase,
-      newProgress
-    );
-
-    await createAuditLog(
-      db,
-      appState.currentUser,
-      'IA_ESTIMATE_PROGRESS',
-      `IA (${model}) estimó avance real de "${proj.name}" de ${oldProgress}% a ${newProgress}% (${data.justification || ''})`
-    );
-
-    showAIFeedbackToast(proj.name, newProgress, newPhase, data.justification);
-    render();
-  } catch (error) {
-    console.error("Error al estimar avance con IA:", error);
-    alert("Hubo un error al consultar a la IA (Ollama): " + (error.message || "Verifica la conexión con el MacBook"));
-    btnEl.disabled = false;
-    btnEl.innerHTML = originalHtml;
+  if (text.startsWith('```json')) {
+    text = text.replace(/^```json/, '').replace(/```$/, '').trim();
+  } else if (text.startsWith('```')) {
+    text = text.replace(/^```/, '').replace(/```$/, '').trim();
   }
-};
+
+  const data = JSON.parse(text);
+  const newProgress = Math.min(100, Math.max(0, Math.round(Number(data.estimatedProgress))));
+  const newPhase = data.inferredPhase || proj.inferredPhase || 'En curso';
+  const oldProgress = proj.realProgress;
+
+  // Actualización optimista en memoria
+  proj.realProgress = newProgress;
+  proj.overallProgress = newProgress;
+  proj.inferredPhase = newPhase;
+  proj.currentPhase = newPhase;
+  proj.progressGap = proj.timeProgress - newProgress;
+
+  // Persistir en Firestore
+  await updateProjectMeta(
+    db,
+    proj.id,
+    proj.name,
+    proj.responsible,
+    proj.client,
+    proj.startDate,
+    proj.deliveryDate,
+    proj.state,
+    newPhase,
+    newProgress
+  );
+
+  await createAuditLog(
+    db,
+    appState.currentUser,
+    'IA_DAILY_AUTO_ESTIMATE',
+    `IA (${model}) estimó automáticamente avance de "${proj.name}" de ${oldProgress}% a ${newProgress}% (${data.justification || ''})`
+  );
+
+  return {
+    success: true,
+    newProgress,
+    newPhase,
+    justification: data.justification
+  };
+}
+
+/**
+ * Evalúa y ejecuta la estimación diaria automática con IA de todos los proyectos activos
+ * Se ejecuta una sola vez al día (comparando fecha YYYY-MM-DD)
+ */
+async function checkAndRunDailyAIEstimation(force = false) {
+  if (isDailyAiRunning) return;
+
+  const role = appState.currentUserRole;
+  if (!appState.currentUser || (role !== 'editor' && role !== 'admin')) {
+    return;
+  }
+
+  if (!appState.projects || appState.projects.length === 0) {
+    return;
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const localLastRun = localStorage.getItem('nexus_last_daily_ai_date');
+
+  if (!force && localLastRun === todayStr) {
+    return;
+  }
+
+  // Verificar en Firestore si ya fue ejecutado hoy
+  if (!force) {
+    const remoteMeta = await getDailyAIEstimationMeta(db);
+    if (remoteMeta && remoteMeta.lastRunDate === todayStr) {
+      localStorage.setItem('nexus_last_daily_ai_date', todayStr);
+      updateDailyAiBadge();
+      return;
+    }
+  }
+
+  // Verificar si el servidor Ollama está disponible
+  const conn = await testOllamaConnection();
+  if (!conn.success) {
+    console.warn("[Auto-IA Diaria] Ollama no disponible actualmente:", conn.message);
+    if (force) {
+      alert(`No se puede ejecutar la estimación: ${conn.message}`);
+    }
+    return;
+  }
+
+  const activeProjects = appState.projects.filter(p => !p.isArchived && p.status !== 'Completado');
+  if (activeProjects.length === 0) {
+    localStorage.setItem('nexus_last_daily_ai_date', todayStr);
+    await setDailyAIEstimationMeta(db, todayStr, 0);
+    updateDailyAiBadge();
+    return;
+  }
+
+  isDailyAiRunning = true;
+  const { model } = getOllamaConfig();
+
+  showDailyAIProgressToast(`Iniciando estimación diaria con IA (${model}) para ${activeProjects.length} proyectos...`);
+
+  let updatedCount = 0;
+  for (let i = 0; i < activeProjects.length; i++) {
+    const proj = activeProjects[i];
+    showDailyAIProgressToast(`Evaluando (${i + 1}/${activeProjects.length}): ${proj.name}...`);
+    try {
+      const res = await estimateProjectWithAI(proj);
+      if (res.success) updatedCount++;
+    } catch (err) {
+      console.error(`Error estimando proyecto "${proj.name}":`, err);
+    }
+    // Pausa breve de 500ms entre llamadas para no saturar
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  localStorage.setItem('nexus_last_daily_ai_date', todayStr);
+  await setDailyAIEstimationMeta(db, todayStr, updatedCount);
+
+  await createAuditLog(
+    db,
+    appState.currentUser,
+    'IA_DAILY_AUTO_ESTIMATE_SUMMARY',
+    `Estimación diaria automática completada (${model}): ${updatedCount}/${activeProjects.length} proyectos actualizados.`
+  );
+
+  showDailyAIProgressToast(`Estimación diaria completada con IA: ${updatedCount} proyectos actualizados.`, true);
+  updateDailyAiBadge();
+  render();
+  isDailyAiRunning = false;
+}
+
+window.forceRunDailyAIEstimation = () => checkAndRunDailyAIEstimation(true);
 
 window.toggleProjectCompleted = async function(projectId, newState) {
   const proj = appState.projects.find(p => p.id === projectId);
@@ -4371,3 +4522,7 @@ window.handleGanttLeave = function(e) {
 
 // Start
 init();
+
+// Chequeo periódico de estimación diaria con IA (cada 30 min y al enfocar pestaña)
+setInterval(() => checkAndRunDailyAIEstimation(), 30 * 60 * 1000);
+window.addEventListener('focus', () => checkAndRunDailyAIEstimation());
